@@ -187,6 +187,7 @@
           });
           state.modes = j.modes;
           state.helpSeen = !!j.helpSeen;
+          state.helpPointerSeen = !!j.helpPointerSeen;
           state.activeMode = j.activeMode || j.modes[0].id;
           state.keys = j.keys || {};
           return;
@@ -267,6 +268,7 @@
 
   function save() {
     var out = { onlyWhenFrontmost:GATE, activeMode:state.activeMode, helpSeen:!!state.helpSeen,
+                helpPointerSeen:!!state.helpPointerSeen,
                 modes:state.modes, keys:state.keys, bindings:buildBindings() };
     var json = JSON.stringify(out, null, 2);
     if (writeFile(CONFIG, json).err !== 0) log("could not write config", "bad");
@@ -313,6 +315,23 @@
     return r;
   }
 
+  // Shown once, when the help card is first dismissed — the only moment the "?"
+  // is genuinely ambiguous. A standing badge would tax attention forever to say
+  // something the user needs once, which is the anti-pattern worth avoiding.
+  function pointAtHelp() {
+    if (state.helpPointerSeen) return;
+    state.helpPointerSeen = true; save();
+    var p = document.getElementById("helpPointer");
+    // Anchored to the button's real position — a fixed offset drifts as soon as
+    // the wordmark's font loads or the panel is resized.
+    var b = document.getElementById("helpBtn").getBoundingClientRect();
+    p.style.left = Math.round(b.left + b.width / 2 - 17) + "px";
+    p.style.top  = Math.round(b.bottom + 7) + "px";
+    p.className = "helppointer show";
+    setTimeout(function () { p.className = "helppointer fade"; }, 3800);
+    setTimeout(function () { p.className = "helppointer"; }, 4600);
+  }
+
   function renderHelp() {
     var el = document.getElementById("help");
     el.innerHTML = "";
@@ -329,13 +348,15 @@
     var close = document.createElement("div");
     close.className = "helpclose";
     close.textContent = "Got it";
-    close.onclick = function () { helpOpen = false; state.helpSeen = true; save(); renderHelp(); };
+    close.onclick = function () {
+      helpOpen = false; state.helpSeen = true; save(); renderHelp(); pointAtHelp();
+    };
     el.appendChild(close);
   }
 
   document.getElementById("helpBtn").onclick = function () {
     helpOpen = !helpOpen;
-    if (!helpOpen) { state.helpSeen = true; save(); }
+    if (!helpOpen) { state.helpSeen = true; save(); renderHelp(); pointAtHelp(); return; }
     renderHelp();
   };
 
@@ -428,6 +449,7 @@
   // keystroke we are trying to capture — and run that command instead. Ask it to
   // let go first, and only prompt once it confirms.
   function beginArming(id) {
+    hideHelpPointer();
     listening = id; armError = null; armReady = false; render();
     // Give the view something focusable, or real keystrokes never arrive.
     var el = document.getElementById("cmd-" + id);
@@ -552,7 +574,7 @@
       row.appendChild(run);
 
       // Capture earns a place on the row: buried in the settings drawer, nobody
-      // found it. The drawer keeps the wordy explanation for first-timers.
+      // found it. The drawer keeps the step-by-step for first-timers.
       if (cfg.effect && s.type === "video") {
         var grab = document.createElement("div");
         grab.className = "iconbtn";
@@ -598,7 +620,8 @@
         if (!cfg.params) {
           var none = document.createElement("div");
           none.className = "nosettings";
-          none.textContent = "This applies " + (cfg.effect || "the effect") + " exactly as Premiere ships it.";
+          none.textContent = "Right now this adds " + (cfg.effect || "the effect") +
+            " with Premiere\u2019s default settings. To use your own:";
           det.appendChild(none);
         }
         parseParams(cfg.params).forEach(function (kv) {
@@ -665,19 +688,31 @@
           line.appendChild(sl); line.appendChild(nb);
           det.appendChild(line);
         });
-        var grab = document.createElement("div");
-        grab.className = "capturebtn";
-        grab.textContent = cfg.params ? "Re-capture from selected clip" : "Capture from selected clip";
-        grab.onclick = function (e) { e.stopPropagation(); capture(s.id, cfg.effect); };
-        det.appendChild(grab);
+        // Concrete steps naming this effect and this key: the old copy assumed
+        // the reader already knew what "capture" was for.
+        var keyTxt = combo(state.keys[s.id]) || "This shortcut";
+        var fxName = cfg.effect || "the effect";
 
-        var help = document.createElement("div");
-        help.className = "capturehelp";
-        help.textContent = "Set " + (cfg.effect || "the effect") +
-          " up on a clip the way you like it, keep that clip selected, then capture. " +
-          (cfg.key || "This key") + " will reuse those settings every time.";
-        help.textContent = "Set it up on a clip how you like, keep that clip selected, then capture \u2014 the shortcut will reuse those exact settings.";
-        det.appendChild(help);
+        var steps = document.createElement("ol");
+        steps.className = "capturesteps";
+        [ "Add " + fxName + " to a clip and adjust it in Effect Controls.",
+          "Leave that clip selected.",
+          "Click Capture below."
+        ].forEach(function (t) {
+          var li = document.createElement("li"); li.textContent = t; steps.appendChild(li);
+        });
+        det.appendChild(steps);
+
+        var outcome = document.createElement("div");
+        outcome.className = "captureoutcome";
+        outcome.textContent = keyTxt + " will then add " + fxName + " with those exact settings.";
+        det.appendChild(outcome);
+
+        var capBtn = document.createElement("div");
+        capBtn.className = "capturebtn";
+        capBtn.textContent = cfg.params ? "Re-capture" : "Capture from selected clip";
+        capBtn.onclick = function (e) { e.stopPropagation(); capture(s.id, cfg.effect); };
+        det.appendChild(capBtn);
 
         var clear = document.createElement("div");
         clear.className = "clearparams";
@@ -818,6 +853,7 @@
 
   // ---------- modes ----------
   function switchMode(id) {
+    hideHelpPointer();
     if (state.activeMode === id) return;
     state.activeMode = id;
     save();                      // rewrites bindings; daemon reloads within ~1s
@@ -887,7 +923,13 @@
   };
 
   // ---------- effect picker ----------
+  function hideHelpPointer() {
+    var p = document.getElementById("helpPointer");
+    if (p) p.className = "helppointer";
+  }
+
   function openPicker(slotId, current) {
+    hideHelpPointer();
     pickerTarget = slotId;
     var slot = slotById(slotId);
     var type = slot ? slot.type : "video";

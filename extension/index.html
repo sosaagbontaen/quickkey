@@ -12,6 +12,7 @@
     </div>
   </header>
 
+  <div id="helpPointer" class="helppointer">Help lives here</div>
   <div id="help" class="help"></div>
   <div class="modebar">
     <label>Mode</label>
@@ -35,8 +36,9 @@
 
   <div id="picker" class="picker">
     <div class="picker-head">
-      <button id="pickerClose">&larr; Back</button>
+      <button id="pickerClose" title="Esc or Backspace also go back">&larr; Back</button>
       <span id="pickerTitle">Choose effect</span>
+      <span class="pickerhint">Esc or Backspace</span>
     </div>
     <input id="pickerSearch" type="text" placeholder="Search…">
     <div id="pickerList"></div>

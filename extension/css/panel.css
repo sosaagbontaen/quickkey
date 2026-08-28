@@ -240,7 +240,9 @@ header{display:flex;justify-content:space-between;align-items:center}
   background:var(--row-hi);border:1px solid var(--accent);border-radius:4px;
 }
 .capturebtn:hover{background:var(--accent);color:#12131c}
-.capturehelp{margin-top:6px;font-size:10.5px;line-height:1.5;color:var(--faint)}
+.capturesteps{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.capturesteps li{font-size:11px;line-height:1.45;color:var(--dim)}
+.captureoutcome{margin-top:8px;font-size:11px;line-height:1.45;color:var(--accent)}
 
 /* ---- symbol controls ---- */
 .iconbtn{
@@ -302,3 +304,24 @@ header{display:flex;justify-content:space-between;align-items:center}
   background:var(--accent);color:#12131c;border:1px solid var(--accent);
 }
 .setbtn:hover{background:var(--accent-hi)}
+
+/* ---- one-time pointer to the help button ---- */
+.helppointer{
+  display:none;position:fixed;z-index:40;
+  padding:5px 10px;border-radius:5px;
+  background:var(--accent);color:#12131c;
+  font:600 11px/1 -apple-system,sans-serif;
+  box-shadow:0 4px 14px rgba(0,0,0,.45);
+}
+.helppointer::before{
+  content:"";position:absolute;top:-4px;left:13px;
+  width:8px;height:8px;background:var(--accent);transform:rotate(45deg);
+}
+.helppointer.show{display:block;opacity:1;transition:opacity .25s ease}
+.helppointer.fade{display:block;opacity:0;transition:opacity .8s ease}
+@media (prefers-reduced-motion:reduce){
+  .helppointer.show,.helppointer.fade{transition:none}
+}
+.pickerhint{
+  flex:0 0 auto;font-size:10px;color:var(--faint);letter-spacing:.03em;white-space:nowrap;
+}
