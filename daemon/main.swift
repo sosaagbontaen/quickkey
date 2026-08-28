@@ -34,6 +34,90 @@ func logLine(_ msg: String) {
     FileHandle.standardOutput.write(line.data(using: .utf8)!)
 }
 
+
+// ---------------------------------------------------------------------------
+// Toast.
+//
+// The panel already flashes a row green, but the editor is looking at the
+// timeline, not at the panel. A brief overlay near the bottom of the screen
+// confirms what happened without pulling attention away.
+//
+// A non-activating panel that ignores mouse events: it must never take focus
+// from Premiere, or the next keystroke would go to the wrong place.
+// ---------------------------------------------------------------------------
+
+final class Toast {
+    static let shared = Toast()
+    private var panel: NSPanel?
+    private var hideWork: DispatchWorkItem?
+
+    func show(_ text: String, ok: Bool) {
+        DispatchQueue.main.async { self.present(text, ok: ok) }
+    }
+
+    private func present(_ text: String, ok: Bool) {
+        hideWork?.cancel()
+        panel?.orderOut(nil)
+        panel = nil
+
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.textColor = ok ? NSColor(calibratedRed: 0.62, green: 0.82, blue: 0.56, alpha: 1)
+                             : NSColor(calibratedRed: 0.92, green: 0.51, blue: 0.44, alpha: 1)
+        label.alignment = .center
+        label.sizeToFit()
+
+        let padX: CGFloat = 18, padY: CGFloat = 11
+        let w = min(max(label.frame.width + padX * 2, 160), 520)
+        let h = label.frame.height + padY * 2
+
+        let blur = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        blur.material = .hudWindow
+        blur.state = .active
+        blur.blendingMode = .behindWindow
+        blur.wantsLayer = true
+        blur.layer?.cornerRadius = 9
+        blur.layer?.masksToBounds = true
+
+        label.frame = NSRect(x: padX, y: padY, width: w - padX * 2, height: label.frame.height)
+        blur.addSubview(label)
+
+        guard let screen = NSScreen.main else { return }
+        let vf = screen.visibleFrame
+        let rect = NSRect(x: vf.midX - w / 2, y: vf.minY + vf.height * 0.13, width: w, height: h)
+
+        let p = NSPanel(contentRect: rect,
+                        styleMask: [.borderless, .nonactivatingPanel],
+                        backing: .buffered, defer: false)
+        p.contentView = blur
+        p.isOpaque = false
+        p.backgroundColor = .clear
+        p.hasShadow = true
+        p.level = .statusBar
+        p.ignoresMouseEvents = true
+        p.isFloatingPanel = true
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        p.alphaValue = 0
+        p.orderFrontRegardless()          // never makeKey — that would steal focus
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.12
+            p.animator().alphaValue = 1
+        }
+        panel = p
+
+        let work = DispatchWorkItem { [weak p] in
+            guard let p = p else { return }
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.35
+                p.animator().alphaValue = 0
+            }, completionHandler: { p.orderOut(nil) })
+        }
+        hideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
+}
+
 struct Binding { let key: String, mods: [String], label: String, script: String }
 
 let keyCodes: [String: UInt32] = [
@@ -73,6 +157,8 @@ func jsonString(_ s: String) -> String {
     return t
 }
 
+var pending: (id: String, label: String, at: Date)? = nil
+
 func send(_ b: Binding) {
     if let gate = frontmostGate,
        NSWorkspace.shared.frontmostApplication?.bundleIdentifier != gate {
@@ -85,6 +171,7 @@ func send(_ b: Binding) {
     ]
     guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
     try? data.write(to: URL(fileURLWithPath: bridgeRequest))
+    pending = (payload["id"]!, b.label, Date())
     let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
     logLine("\(f.string(from: Date()))  \(b.label)")
 }
@@ -147,6 +234,35 @@ var lastStamp = (try? FileManager.default.attributesOfItem(atPath: configPath)[.
 Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
     let now = (try? FileManager.default.attributesOfItem(atPath: configPath)[.modificationDate] as? Date) ?? nil
     if now != lastStamp { lastStamp = now; logLine("config changed — reloading"); loadAndRegister() }
+}
+
+// The panel reports what actually happened; turn that into the toast. A binding
+// label already reads "Add Default Blur (Gaussian Blur)", which is what we want
+// on screen — the effect name matters as much as the command.
+Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+    guard let want = pending else { return }
+
+    if Date().timeIntervalSince(want.at) > 4 {
+        pending = nil
+        Toast.shared.show("QuickKey panel is not responding", ok: false)
+        return
+    }
+    guard let data = FileManager.default.contents(atPath: "\(root)/bridge/response.json"),
+          let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+          let id = j["id"] as? String, id == want.id
+    else { return }
+
+    pending = nil
+    let result = (j["result"] as? String) ?? ""
+    let failed = result.hasPrefix("ERR:") || result.hasPrefix("QK_ERR") || result == "EvalScript error."
+    if failed {
+        // Show Premiere's own complaint — "Nothing selected" is the useful bit.
+        var msg = result
+        for p in ["ERR: ", "QK_ERR: "] where msg.hasPrefix(p) { msg = String(msg.dropFirst(p.count)) }
+        Toast.shared.show(msg, ok: false)
+    } else {
+        Toast.shared.show(want.label, ok: true)
+    }
 }
 
 // Carbon hotkeys arrive through the Cocoa event loop, not a bare RunLoop.

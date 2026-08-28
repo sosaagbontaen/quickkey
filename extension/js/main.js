@@ -447,6 +447,8 @@
         });
       };
       row.appendChild(rm);
+      row.title = "Click to run this now";
+      row.onclick = function () { runCommand(s.id, s.effect ? scriptFor(s, s) : "", s.label); };
       elList.appendChild(row);
 
       if (expanded === s.id && cfg.params) {
@@ -538,6 +540,8 @@
       var body = document.createElement("div"); body.className="body";
       var lb = document.createElement("div"); lb.className="label"; lb.textContent = a.label;
       body.appendChild(lb); row.appendChild(body);
+      row.title = "Click to run this now";
+      row.onclick = function () { runCommand(a.id, a.script, a.label); };
       elList.appendChild(row);
     });
 
@@ -558,6 +562,18 @@
       }
       row.onclick = function(){ switchMode(md.id); };
       elList.appendChild(row);
+    });
+  }
+
+  // Running from the panel as well as from a hotkey: the fastest way to check a
+  // default does what you meant without leaving the panel to go press a key.
+  function runCommand(id, script, label) {
+    if (!script) { log("nothing set for " + label, "bad"); return; }
+    evalHost(script, function (result) {
+      var bad = String(result).indexOf("QK_ERR") === 0 ||
+                String(result).indexOf("ERR:") === 0 || result === "EvalScript error.";
+      flash(id, bad ? "bad" : "fired");
+      log(String(result).slice(0, 160), bad ? "bad" : "ok");
     });
   }
 

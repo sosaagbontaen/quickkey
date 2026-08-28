@@ -62,13 +62,24 @@ $.global.qkApplyEffect = function (effectName) {
 $.global.qkStripEffects = function () {
     var f = qkFindSelected();
     if (f.err) return "ERR: " + f.err;
-    // Public-DOM components expose no remove(); QE's removeEffects() strips the
-    // clip back to its intrinsics (Motion, Opacity) in one call.
-    var n = 0;
+
+    // QE's removeEffects() only works on video — on an audio clip it returns
+    // true and does nothing. Removing components individually works for both.
+    // Intrinsics cannot be removed and must be skipped.
+    var KEEP = { "Opacity":1, "Motion":1, "Time Remapping":1,
+                 "Volume":1, "Channel Volume":1, "Panner":1 };
+    var removed = 0;
     for (var i = 0; i < f.hits.length; i++) {
-        if (qkQEItem(f.hits[i]).removeEffects()) n++;
+        var it = qkQEItem(f.hits[i]);
+        // Back to front: removing a component reindexes the ones after it.
+        for (var j = it.numComponents - 1; j >= 0; j--) {
+            var c = it.getComponentAt(j);
+            if (!c || KEEP[c.name]) continue;
+            try { if (c.remove()) removed++; } catch (e) {}
+        }
     }
-    return "OK: stripped " + n + " clip(s) back to Motion/Opacity";
+    return removed ? "OK: removed " + removed + " effect(s)"
+                   : "OK: nothing to remove";
 };
 
 $.global.qkRippleDelete = function () {
