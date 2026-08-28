@@ -217,3 +217,14 @@ header{display:flex;justify-content:space-between;align-items:center}
   margin:9px 0 0;font-size:11px;color:var(--dim);line-height:1.4;
 }
 .hint b{color:var(--text);font-weight:600}
+
+/* ---- explicit run control ----
+   Deliberately quiet until hovered: the panel is a settings surface, and
+   touching the timeline should take intent, not a stray click. */
+.runbtn{
+  flex:0 0 auto;width:19px;height:19px;display:grid;place-items:center;
+  font-size:8px;color:var(--faint);border:1px solid transparent;border-radius:3px;
+  cursor:pointer;opacity:.35;
+}
+.cmd:hover .runbtn{opacity:1;border-color:var(--line)}
+.runbtn:hover{color:var(--accent);border-color:var(--accent);background:var(--row-hi)}

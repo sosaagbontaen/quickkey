@@ -498,11 +498,22 @@
       };
       row.appendChild(rm);
       row.title = "Click to run this now";
-      // Match the label the hotkey path uses, so a toast reads the same either way.
-      row.onclick = function () {
+      // Clicking a row opens its settings, never fires it. The obvious gesture
+      // must be the safe one — a first-time user clicking a row expects to
+      // configure it, not to have an effect land on their timeline.
+      row.title = "Change which effect this applies";
+      row.onclick = function () { openPicker(s.id, s.effect); };
+
+      var run = document.createElement("div");
+      run.className = "runbtn";
+      run.textContent = "\u25b6";
+      run.title = "Run now on the selected clip";
+      run.onclick = function (e) {
+        e.stopPropagation();
         runCommand(s.id, s.effect ? scriptFor(s, s) : "",
                    s.label + (s.effect ? " (" + s.effect + ")" : ""));
       };
+      row.insertBefore(run, row.firstChild.nextSibling);
       elList.appendChild(row);
 
       if (expanded === s.id && cfg.params) {
@@ -594,8 +605,12 @@
       var body = document.createElement("div"); body.className="body";
       var lb = document.createElement("div"); lb.className="label"; lb.textContent = a.label;
       body.appendChild(lb); row.appendChild(body);
-      row.title = "Click to run this now";
-      row.onclick = function () { runCommand(a.id, a.script, a.label); };
+      var arun = document.createElement("div");
+      arun.className = "runbtn";
+      arun.textContent = "\u25b6";
+      arun.title = "Run now on the selected clip";
+      arun.onclick = function (e) { e.stopPropagation(); runCommand(a.id, a.script, a.label); };
+      row.appendChild(arun);
       elList.appendChild(row);
     });
 
