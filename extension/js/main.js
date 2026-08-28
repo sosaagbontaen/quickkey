@@ -321,15 +321,20 @@
   function pointAtHelp() {
     if (state.helpPointerSeen) return;
     state.helpPointerSeen = true; save();
+
     var p = document.getElementById("helpPointer");
-    // Anchored to the button's real position — a fixed offset drifts as soon as
-    // the wordmark's font loads or the panel is resized.
     var b = document.getElementById("helpBtn").getBoundingClientRect();
+    // Measured, not hard-coded: the button shifts once the wordmark font loads.
     p.style.left = Math.round(b.left + b.width / 2 - 17) + "px";
     p.style.top  = Math.round(b.bottom + 7) + "px";
+    p.onclick = hideHelpPointer;
     p.className = "helppointer show";
-    setTimeout(function () { p.className = "helppointer fade"; }, 3800);
-    setTimeout(function () { p.className = "helppointer"; }, 4600);
+
+    while (pointerTimers.length) clearTimeout(pointerTimers.pop());
+    pointerTimers.push(setTimeout(function () {
+      if (p.className.indexOf("show") !== -1) p.className = "helppointer fade";
+    }, 3500));
+    pointerTimers.push(setTimeout(hideHelpPointer, 4400));
   }
 
   function renderHelp() {
@@ -923,10 +928,17 @@
   };
 
   // ---------- effect picker ----------
+  var pointerTimers = [];
+
   function hideHelpPointer() {
+    while (pointerTimers.length) clearTimeout(pointerTimers.pop());
     var p = document.getElementById("helpPointer");
     if (p) p.className = "helppointer";
   }
+
+  // Dismiss on any interaction, not only on the timer — a note that outlives
+  // the moment it explains becomes clutter.
+  document.addEventListener("mousedown", function () { hideHelpPointer(); }, true);
 
   function openPicker(slotId, current) {
     hideHelpPointer();
@@ -946,7 +958,14 @@
     var cmd = type === "audio" ? "qkListAudioEffects()"
             : type === "transition" ? "qkListTransitions()" : "qkListEffects()";
     evalHost(cmd, function (r) {
-      effectCache[type] = String(r).split("|").filter(function (x) { return x && x.indexOf("QK_ERR") !== 0; });
+      // Premiere lists some effects twice under one name (Transform, Noise
+      // (Legacy)). We resolve effects by name, so both rows would apply the
+      // identical effect — showing two is confusion with no upside.
+      var seen = {};
+      effectCache[type] = String(r).split("|").filter(function (x) {
+        if (!x || x.indexOf("QK_ERR") === 0 || seen[x]) return false;
+        seen[x] = 1; return true;
+      });
       box.placeholder = "Search " + effectCache[type].length + " " +
         (type === "transition" ? "transitions" : type === "audio" ? "audio effects" : "effects") + "…";
       drawPicker("", current);

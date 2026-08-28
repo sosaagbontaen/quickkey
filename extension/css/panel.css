@@ -325,3 +325,4 @@ header{display:flex;justify-content:space-between;align-items:center}
 .pickerhint{
   flex:0 0 auto;font-size:10px;color:var(--faint);letter-spacing:.03em;white-space:nowrap;
 }
+.helppointer{cursor:pointer}
