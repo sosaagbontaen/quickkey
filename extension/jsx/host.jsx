@@ -191,7 +191,7 @@ $.global.qkCaptureFrom = function (effectName) {
     for (var i = 0; i < comps.numItems; i++) {
         if (comps[i].displayName === effectName) found = comps[i];   // last wins
     }
-    if (!found) return "ERR: '" + effectName + "' is not on the selected clip";
+    if (!found) return "ERR: no " + effectName + " on the selected clip. Add it, set it how you like, then capture.";
     return "OK|" + qkSerializeParams(found);
 };
 

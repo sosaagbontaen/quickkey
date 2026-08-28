@@ -25,6 +25,7 @@
   var effectCache = {};      // per slot type
   var pickerTarget = null;
   var armError = null;
+  var helpOpen = false;
   var armReady = false;
   var armTimer = null;
   var expanded = null;      // slot id whose captured settings are shown
@@ -185,6 +186,7 @@
             m.slots = arr;
           });
           state.modes = j.modes;
+          state.helpSeen = !!j.helpSeen;
           state.activeMode = j.activeMode || j.modes[0].id;
           state.keys = j.keys || {};
           return;
@@ -264,12 +266,78 @@
   }
 
   function save() {
-    var out = { onlyWhenFrontmost:GATE, activeMode:state.activeMode,
+    var out = { onlyWhenFrontmost:GATE, activeMode:state.activeMode, helpSeen:!!state.helpSeen,
                 modes:state.modes, keys:state.keys, bindings:buildBindings() };
     var json = JSON.stringify(out, null, 2);
     if (writeFile(CONFIG, json).err !== 0) log("could not write config", "bad");
     backup(json);
   }
+
+  // Premiere keeps keyboard focus for its own shortcuts, so a CEP panel gets no
+  // keydown at all unless it registers interest in specific combinations. Without
+  // this, capturing a shortcut silently never fires.
+  (function registerKeys() {
+    if (typeof window.__adobe_cep__.registerKeyEventsInterest !== "function") return;
+    var codes = [8, 27];                                   // backspace, escape
+    for (var c = 48; c <= 57; c++) codes.push(c);          // 0-9
+    for (var c = 65; c <= 90; c++) codes.push(c);          // A-Z
+    for (var c = 112; c <= 123; c++) codes.push(c);        // F1-F12
+    var mods = [
+      {}, {ctrlKey:1}, {altKey:1}, {metaKey:1},
+      {ctrlKey:1,altKey:1}, {ctrlKey:1,shiftKey:1}, {altKey:1,shiftKey:1},
+      {ctrlKey:1,altKey:1,shiftKey:1}, {metaKey:1,altKey:1}, {metaKey:1,shiftKey:1}
+    ];
+    var want = [];
+    for (var i = 0; i < codes.length; i++) {
+      for (var m = 0; m < mods.length; m++) {
+        var e = { keyCode: codes[i] };
+        for (var k in mods[m]) e[k] = true;
+        want.push(e);
+      }
+    }
+    try {
+      var res = window.__adobe_cep__.registerKeyEventsInterest(JSON.stringify(want));
+      log("keyboard registered (" + want.length + " combos)", "ok");
+    } catch (e) { log("could not register keyboard: " + e, "bad"); }
+  })();
+
+  // ---------- help ----------
+  // Kept out of the way rather than occupying the panel permanently: this is a
+  // tool for reclaiming screen space, so standing instructions are a poor trade.
+  function helpRow(symbolHTML, symbolText, text) {
+    var r = document.createElement("div"); r.className = "helprow";
+    var k = document.createElement("div"); k.className = "helpkey";
+    if (symbolHTML) k.innerHTML = symbolHTML; else k.textContent = symbolText;
+    var t = document.createElement("div"); t.className = "helptext"; t.textContent = text;
+    r.appendChild(k); r.appendChild(t);
+    return r;
+  }
+
+  function renderHelp() {
+    var el = document.getElementById("help");
+    el.innerHTML = "";
+    el.className = helpOpen ? "help open" : "help";
+    if (!helpOpen) return;
+
+    el.appendChild(helpRow(null, "Ctrl+Opt+B", "Click a key box, then hold Control and Option and press a key."));
+    el.appendChild(helpRow(QK_ICON.blur, null, "Click a row to choose which effect it applies."));
+    el.appendChild(helpRow(QK_ICON.play, null, "Apply it to the clip you have selected, without the shortcut."));
+    el.appendChild(helpRow(QK_ICON.pick, null, "Set an effect up on a clip, keep it selected, then press this to make those settings your default."));
+    el.appendChild(helpRow(null, "\u00d7", "Remove that default from this mode."));
+    el.appendChild(helpRow(QK_ICON.mode, null, "A mode is a set of defaults. The same key can apply a different effect in each one."));
+
+    var close = document.createElement("div");
+    close.className = "helpclose";
+    close.textContent = "Got it";
+    close.onclick = function () { helpOpen = false; state.helpSeen = true; save(); renderHelp(); };
+    el.appendChild(close);
+  }
+
+  document.getElementById("helpBtn").onclick = function () {
+    helpOpen = !helpOpen;
+    if (!helpOpen) { state.helpSeen = true; save(); }
+    renderHelp();
+  };
 
   // ---------- rendering ----------
   // "Name=value", "Name=value~min~max" or "Name=true~bool"
@@ -361,6 +429,9 @@
   // let go first, and only prompt once it confirms.
   function beginArming(id) {
     listening = id; armError = null; armReady = false; render();
+    // Give the view something focusable, or real keystrokes never arrive.
+    var el = document.getElementById("cmd-" + id);
+    if (el) { el.tabIndex = -1; el.focus(); }
     writeFile(BRIDGE + "/suspend.json", JSON.stringify({ on: true, t: Date.now() }));
 
     var tries = 0;
@@ -446,10 +517,11 @@
       var sub = document.createElement("div");
       sub.className = "sub" + (cfg.effect ? "" : " unset");
       sub.textContent = (listening === s.id)
-        ? (armError || (armReady ? "hold Control and Option, then press a key"
+        ? (armError || (armReady ? "press a key, or pick one below"
                                  : "pausing shortcuts\u2026"))
         : (cfg.effect || "choose an effect\u2026");
       if (listening === s.id) sub.className = "sub arming" + (armError ? " err" : "");
+      if (listening === s.id && armReady) body.appendChild(keyChooser(s.id));
       sub.onclick = function(e){ e.stopPropagation(); openPicker(s.id, cfg.effect); };
       body.appendChild(lb); body.appendChild(sub);
 
@@ -478,6 +550,17 @@
                    s.label + (s.effect ? " (" + s.effect + ")" : ""));
       };
       row.appendChild(run);
+
+      // Capture earns a place on the row: buried in the settings drawer, nobody
+      // found it. The drawer keeps the wordy explanation for first-timers.
+      if (cfg.effect && s.type === "video") {
+        var grab = document.createElement("div");
+        grab.className = "iconbtn";
+        grab.innerHTML = QK_ICON.pick;
+        grab.title = "Save the selected clip\u2019s settings as this default";
+        grab.onclick = function (e) { e.stopPropagation(); capture(s.id, cfg.effect); };
+        row.appendChild(grab);
+      }
 
       if (s.type !== "video") {
         var pill = document.createElement("div");
@@ -657,6 +740,7 @@
                 String(result).indexOf("ERR:") === 0 || result === "EvalScript error.";
       flash(id, bad ? "bad" : "fired");
       log(String(result).slice(0, 160), bad ? "bad" : "ok");
+      if (bad) toast(String(result).replace(/^(QK_)?ERR:\s*/, ""), false);
     });
   }
 
@@ -664,6 +748,64 @@
   // so the panel asks for one by leaving a note in the bridge.
   function toast(text, ok) {
     writeFile(BRIDGE + "/toast.json", JSON.stringify({ id: String(Date.now()), text: text, ok: !!ok }));
+  }
+
+  // Key capture depends on Premiere releasing focus, which it does not always do.
+  // This picker always works, because it needs only the mouse.
+  function keyChooser(id) {
+    var wrap = document.createElement("div"); wrap.className = "chooser";
+    var chosen = { ctrl: true, opt: true, shift: false, cmd: false };
+
+    ["ctrl", "opt", "shift", "cmd"].forEach(function (m) {
+      var b = document.createElement("span");
+      b.className = "modchip" + (chosen[m] ? " on" : "");
+      b.textContent = { ctrl: "Ctrl", opt: "Opt", shift: "Shift", cmd: "Cmd" }[m];
+      b.onclick = function (e) {
+        e.stopPropagation();
+        chosen[m] = !chosen[m];
+        b.className = "modchip" + (chosen[m] ? " on" : "");
+      };
+      wrap.appendChild(b);
+    });
+
+    var sel = document.createElement("select"); sel.className = "keysel";
+    var keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
+    for (var f = 1; f <= 8; f++) keys.push("F" + f);
+    keys.forEach(function (k) {
+      var o = document.createElement("option"); o.value = k; o.textContent = k; sel.appendChild(o);
+    });
+    sel.onclick = function (e) { e.stopPropagation(); };
+    wrap.appendChild(sel);
+
+    var set = document.createElement("span");
+    set.className = "setbtn"; set.textContent = "Set";
+    set.onclick = function (e) {
+      e.stopPropagation();
+      var mods = [];
+      ["ctrl", "opt", "cmd", "shift"].forEach(function (m) { if (chosen[m]) mods.push(m); });
+      if (!mods.length) { armError = "pick Ctrl or Opt as well"; render(); return; }
+      assignKey(id, sel.value, mods);
+    };
+    wrap.appendChild(set);
+    return wrap;
+  }
+
+  function assignKey(target, key, mods) {
+    armError = null;
+    mark("rebind key");
+    for (var other in state.keys) {
+      if (state.keys[other].key === key &&
+          (state.keys[other].mods || []).join() === mods.join() && other !== target) {
+        delete state.keys[other];
+      }
+    }
+    if (target.indexOf("mode:") === 0) {
+      state.modes.forEach(function (m) { if ("mode:" + m.id === target) { m.key = key; m.mods = mods; } });
+    } else {
+      state.keys[target] = { key: key, mods: mods };
+    }
+    log("bound " + combo({ key: key, mods: mods }), "ok");
+    save(); endArming();
   }
 
   function flash(id, cls) {
@@ -750,7 +892,9 @@
     var slot = slotById(slotId);
     var type = slot ? slot.type : "video";
     document.getElementById("pickerTitle").textContent = "Effect for " + (slot ? slot.label : slotId);
-    document.getElementById("picker").className = "picker show";
+    var pk = document.getElementById("picker");
+    pk.className = "picker show";
+    pk.tabIndex = -1; pk.focus();
     // Deliberately not focused: with the caret in the search box, Backspace
     // would edit text instead of going back.
     var box = document.getElementById("pickerSearch"); box.value = ""; box.blur();
@@ -832,14 +976,22 @@
   };
   document.getElementById("pickerSearch").onkeydown = function(e){
     e.stopPropagation();
-    if (e.key === "Escape") closePicker();
+    if (e.key === "Escape") { closePicker(); return; }
+    if (e.key === "Backspace" && this.value === "") { e.preventDefault(); closePicker(); }
   };
 
   // ---------- capture ----------
   function capture(slotId, effectName) {
     evalHost("qkProbeParams(" + JSON.stringify(effectName) + ")", function (r) {
       var s = String(r);
-      if (s.indexOf("OK|") !== 0) { log(s, "bad"); return; }
+      if (s.indexOf("OK|") !== 0) {
+        // Failing quietly into the activity log left people guessing.
+        var msg = s.replace(/^(QK_)?ERR:\s*/, "");
+        log(msg, "bad");
+        toast(msg, false);
+        flash(slotId, "bad");
+        return;
+      }
       mark("capture " + effectName + " settings");
       var sl = slotById(slotId);
       if (!sl) { log("that default no longer exists", "bad"); return; }
@@ -943,7 +1095,9 @@
   };
 
   // ---------- boot ----------
-  loadConfig(); scrubParams(); save(); render();
+  loadConfig(); scrubParams(); save();
+  helpOpen = !state.helpSeen;   // first run explains itself
+  renderHelp(); render();
   evalHost("$.evalFile(File(" + JSON.stringify(HOSTJSX) + ")); app.setExtensionPersistent('com.quickkey.dev.panel',1); 'ready ' + app.version",
     function (v) {
       document.getElementById("dot").className = "on";

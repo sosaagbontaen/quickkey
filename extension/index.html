@@ -8,10 +8,12 @@
 <body>
   <header>
     <div class="brand"><img src="img/mark@2x.png" alt=""><span>Quick<b>Key</b></span></div>
-    <div class="status"><i id="dot"></i><span id="statusText">connecting…</span></div>
+    <div class="status"><i id="dot"></i><span id="statusText">connecting…</span>
+      <button id="helpBtn" title="How this works">?</button>
+    </div>
   </header>
 
-  <p class="hint">Click a row to choose its effect. Click the <b>key box</b> to set a shortcut. <b>Test</b> applies it to the clip you have selected.</p>
+  <div id="help" class="help"></div>
   <div class="modebar">
     <label>Mode</label>
     <select id="modeSelect"></select>
