@@ -20,133 +20,153 @@ lipo -create /tmp/qkd-arm64 /tmp/qkd-x86 -output "$APP/Contents/MacOS/QuickKeyDa
 rm -f /tmp/qkd-arm64 /tmp/qkd-x86
 codesign --force --sign - "$APP"
 
-# 3. installer
-cat > "$OUT/install.sh" << 'INNER'
+# 3. installer — a real .app so a non-technical user never sees a terminal.
+#    Payload lives inside the bundle, so the whole thing is one file to send.
+INST="$OUT/Install QuickKey.app"
+mkdir -p "$INST/Contents/MacOS" "$INST/Contents/Resources"
+mv "$OUT/com.quickkey.dev" "$INST/Contents/Resources/"
+cp -R "$OUT/QuickKeyDaemon.app" "$INST/Contents/Resources/"
+rm -rf "$OUT/QuickKeyDaemon.app"
+
+cat > "$INST/Contents/Info.plist" << 'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Install QuickKey</string>
+  <key>CFBundleDisplayName</key><string>Install QuickKey</string>
+  <key>CFBundleIdentifier</key><string>com.quickkey.installer</string>
+  <key>CFBundleExecutable</key><string>installer</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+</dict>
+</plist>
+PLIST
+
+cat > "$INST/Contents/MacOS/installer" << 'INNER'
 #!/bin/bash
-cd "$(dirname "$0")"
-echo
-echo "Installing QuickKey…"
-# Anything downloaded or messaged arrives quarantined by macOS. Clear it for the
-# whole payload up front, otherwise Gatekeeper blocks the daemon later.
-xattr -dr com.apple.quarantine . 2>/dev/null
+RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
+say() { osascript -e "display dialog \"$1\" buttons {\"OK\"} default button 1 with title \"QuickKey\"" >/dev/null 2>&1; }
+
+xattr -dr com.apple.quarantine "$RES" 2>/dev/null
+
 EXTDIR="$HOME/Library/Application Support/Adobe/CEP/extensions"
-mkdir -p "$EXTDIR"
+mkdir -p "$EXTDIR" || { say "Could not create the Premiere extensions folder."; exit 1; }
 rm -rf "$EXTDIR/com.quickkey.dev"
-cp -R com.quickkey.dev "$EXTDIR/"
-echo "  panel installed"
+cp -R "$RES/com.quickkey.dev" "$EXTDIR/" || { say "Could not install the panel."; exit 1; }
 
-# CEP refuses unsigned extensions unless debug mode is on. Local, reversible.
+# Premiere refuses unsigned extensions unless this is on. Local and reversible.
 for v in 10 11 12 13; do defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1 2>/dev/null; done
-echo "  allowed unsigned extensions (undo: defaults write com.adobe.CSXS.12 PlayerDebugMode 0)"
 
-rm -rf "$HOME/Applications/QuickKeyDaemon.app"
 mkdir -p "$HOME/Applications"
-cp -R QuickKeyDaemon.app "$HOME/Applications/"
+rm -rf "$HOME/Applications/QuickKeyDaemon.app"
+cp -R "$RES/QuickKeyDaemon.app" "$HOME/Applications/"
 xattr -dr com.apple.quarantine "$HOME/Applications/QuickKeyDaemon.app" 2>/dev/null
-echo "  hotkey daemon installed to ~/Applications"
-echo
-echo "Next:"
-echo "  1. Quit Premiere completely and reopen it."
-echo "  2. Window > Extensions > QuickKey"
-echo "  3. Open ~/Applications/QuickKeyDaemon.app  (no window — it runs in the background)"
-echo
-echo "Hotkeys are Ctrl+Option + the letter shown on each row."
-echo "To stop it:  pkill -f QuickKeyDaemon"
-echo
-read -p "Press return to close."
+
+# Start it now so there is one less step to explain.
+open "$HOME/Applications/QuickKeyDaemon.app" 2>/dev/null
+
+say "QuickKey installed.
+
+Next:
+1. Quit Premiere completely, then reopen it.
+2. Window menu > Extensions > QuickKey
+3. Click a clip, press Control-Option-B
+
+The hotkey helper is already running in the background."
 INNER
-chmod +x "$OUT/install.sh"
-cp "$OUT/install.sh" "$OUT/INSTALL.command"
-chmod +x "$OUT/INSTALL.command"
+chmod +x "$INST/Contents/MacOS/installer"
+codesign --force --deep --sign - "$INST" 2>/dev/null || true
 
-cat > "$OUT/README.txt" << 'INNER'
-QuickKey — prototype build
-==========================
-Turns repeated Premiere operations into single keystrokes, applied to whatever
-you have selected.
-
-Requires macOS and Premiere Pro 2024 or newer.
+# 4. README, written for someone who does not use a terminal
+cat > "$OUT/READ ME FIRST.txt" << 'INNER'
+QuickKey
+========
+Press one key, and the effect you chose lands on the clip you selected.
 
 
-INSTALL  —  use Terminal. It really is the easy path here.
+INSTALLING  (about a minute, and only once)
 
-  1. Open Terminal (Cmd+Space, type "terminal", Enter)
-  2. Type this, INCLUDING the space at the end:   bash 
-  3. Drag install.sh from this folder onto the Terminal window
-  4. Press Enter
+  1. Double-click "Install QuickKey".
 
-  It installs the panel, allows unsigned extensions, and puts the daemon in
-  ~/Applications.
+  2. macOS will refuse and say it "could not verify" the app.
+     Click Done.  Do NOT click "Move to Trash".
 
-  Then quit Premiere completely, reopen it, and choose
-  Window > Extensions > QuickKey.
-  Launch ~/Applications/QuickKeyDaemon.app — it has no window, it just runs.
+     This is expected. The app is not signed by Apple, because signing needs
+     a paid developer account we do not have yet. Nothing is wrong.
 
-  DO NOT double-click the installer. This build is not signed by Apple —
-  signing needs a paid developer account we do not have yet — and macOS 15 and
-  newer removed the option to click past that warning. If you see "Apple could
-  not verify...", click Done, NOT Move to Trash, and use Terminal instead.
-  Terminal runs the identical file by a route Gatekeeper does not block.
+  3. Open System Settings, then Privacy & Security.
+     Scroll down to the Security section near the bottom.
+     There is a line saying "Install QuickKey" was blocked,
+     with an "Open Anyway" button. Click it, and confirm with your
+     password or Touch ID.
+
+  4. Double-click "Install QuickKey" again.
+     This time it installs, and tells you when it is done.
 
 
-FIRST TRY
-  Select a clip on the timeline and press Ctrl+Option+B.
-  Select a different clip and press it again — it follows your selection.
+THEN
+
+  Quit Premiere completely and reopen it.
+  Choose  Window > Extensions > QuickKey  to show the panel.
+
+  Click a clip on the timeline and press  Control-Option-B.
+  Click a different clip and press it again — it follows your selection.
   That is the whole idea.
 
 
 THE PANEL
-  Key chip      Click it, then press the key you want. Backspace clears.
-  Effect name   Click to choose from every effect Premiere has.
-  CAPTURE       Set an effect up on a clip the way you like it, keep that clip
-                selected, then hit CAPTURE. Those exact settings become your
-                default. Expand "N settings captured" to see and adjust them.
-  x             Remove a default from this mode. Any of them, including the
-                ones that ship by default.
-  + add default Create your own — a second grade, an audio chain, whatever.
 
-MODES
-  A mode is a set of defaults. The same key can be Gaussian Blur in one mode
-  and Compound Blur in another. Create as many as you like and give them keys.
-  New modes start from the standard set of defaults.
+  The key box     Click it, then press whatever key you want. Backspace clears.
+  The effect name Click it to pick from every effect Premiere has.
+  CAPTURE         Set an effect up on a clip exactly how you like it, keep that
+                  clip selected, then press CAPTURE. Those settings become your
+                  default. Open "N settings captured" to see or adjust them.
+  x               Remove a default from this mode. Any of them.
+  + add default   Make your own, e.g. a second grade.
 
-  Cmd+Z undoes changes made in the panel.
+  Cmd-Z undoes changes made in the panel.
+
+  MODES are sets of defaults. The same key can be one blur in one mode and a
+  different blur in another. Make as many as you like.
 
 
-WHAT SHIPS BOUND
-  Ctrl+Opt+B  blur          Ctrl+Opt+M  add marker
-  Ctrl+Opt+G  grade         Ctrl+Opt+E  toggle clip on/off
-  Ctrl+Opt+T  transition    Ctrl+Opt+F  scale to frame
-  Ctrl+Opt+A  audio effect  Ctrl+Opt+D  ripple delete
-  Ctrl+Opt+S  sharpen       Ctrl+Opt+X  strip all effects
-  Ctrl+Opt+1  switch mode
+WHAT IS SET UP ALREADY
 
-  Drop Shadow, Transform, Crop and Lens Distortion are set up but unbound —
-  give them keys if you want them.
+  Ctrl-Opt-B  blur           Ctrl-Opt-M  add marker
+  Ctrl-Opt-G  grade          Ctrl-Opt-E  turn clip off/on
+  Ctrl-Opt-T  transition     Ctrl-Opt-F  scale to frame
+  Ctrl-Opt-A  audio effect   Ctrl-Opt-D  ripple delete
+  Ctrl-Opt-S  sharpen        Ctrl-Opt-X  remove all effects
+  Ctrl-Opt-1  switch mode
 
-
-KNOWN LIMITS — please read, these are the open questions
-  - Hotkeys need a modifier. A bare key gets swallowed system-wide by macOS
-    with no way to hand it back, so single-key bindings are refused for now.
-    Whether it is worth a permissions prompt to get real single keys is one of
-    the main things we want your opinion on.
-  - CAPTURE stores numbers and toggles only, not colours or curves. So it works
-    well for blurs and transforms, and does NOT properly capture a Lumetri
-    grade yet.
-  - Dropdown parameters show as "Option 0 / 1 / 2" unless we have recorded the
-    real names for that effect.
-  - Transitions land at the head of the selected clip.
-  - Unsigned build, and it leans on an undocumented part of Premiere. If your
-    version behaves differently, the panel's Activity box will show a red
-    error — please copy that line and send it over.
+  Drop Shadow, Transform, Crop and Lens Distortion are ready but have no key
+  yet — click their key box to give them one.
 
 
-IF SOMETHING GOES WRONG
-  pkill -f QuickKeyDaemon        stops it, releases every key immediately
-  Panel blank or disconnected?   quit and reopen Premiere
+THINGS WE ALREADY KNOW ARE WRONG  (please tell us what else you find)
+
+  - Every shortcut needs Ctrl and Option held down. Plain single keys get
+    swallowed by macOS everywhere, with no way to give them back. Whether it
+    is worth a scary permission prompt to get real single keys is one of the
+    main things we want your opinion on.
+  - CAPTURE remembers numbers and switches, but not colours. So it works well
+    for blurs, and it does NOT properly remember a Lumetri grade yet.
+  - Some dropdown settings show as "Option 0 / 1 / 2" instead of real names.
+  - Transitions land at the start of the selected clip.
+  - If something fails, the Activity box at the bottom of the panel shows a red
+    line. Please copy it and send it over — that is genuinely useful to us.
+
+
+TURNING IT OFF
+
+  The hotkeys come from a small background app called QuickKeyDaemon,
+  in your Applications folder. Quit it and every key goes back to normal.
+  It does not start by itself when you reboot — open it again when you want it.
 INNER
 
 cd dist && zip -qr QuickKey-mac.zip QuickKey && cd ..
 echo
 echo "built: dist/QuickKey-mac.zip  ($(du -h dist/QuickKey-mac.zip | cut -f1))"
-lipo -archs "$APP/Contents/MacOS/QuickKeyDaemon" | sed 's/^/  daemon architectures: /'
+lipo -archs "$INST/Contents/Resources/QuickKeyDaemon.app/Contents/MacOS/QuickKeyDaemon" | sed 's/^/  daemon architectures: /'
