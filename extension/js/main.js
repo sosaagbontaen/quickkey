@@ -394,7 +394,7 @@
     c.className = "chip" + (t ? "" : " empty") + (listening === id ? " arming" : "");
     // An empty slot said "—", which reads as "none" rather than "click me".
     c.textContent = (listening === id) ? (armReady ? "press…" : "wait…") : (t || "set key");
-    c.title = "Click, then hold Ctrl/Opt and press a key. Backspace clears it.";
+    c.title = "Click, then hold Ctrl and Option and press a key. Backspace clears it.";
     c.onclick = function(e){
       e.stopPropagation();
       if (listening === id) endArming(); else beginArming(id);
@@ -439,7 +439,7 @@
       row.appendChild(chipFor(s.id, state.keys[s.id]));
 
       var ic = document.createElement("div"); ic.className = "icon";
-      ic.innerHTML = QK_ICON[s.icon] || ""; row.appendChild(ic);
+      ic.innerHTML = qkIconFor(cfg.effect, s.icon); row.appendChild(ic);
 
       var body = document.createElement("div"); body.className = "body";
       var lb = document.createElement("div"); lb.className = "label"; lb.textContent = s.label;
@@ -456,16 +456,28 @@
       if (cfg.effect && s.type === "video") {
         var n = parseParams(cfg.params).length;
         var badge = document.createElement("div");
-        badge.className = "settings" + (n ? "" : " none");
-        badge.textContent = n
-          ? (expanded === s.id ? "▾ " : "▸ ") + n + " setting" + (n===1?"":"s") + " captured"
-          : "default settings — nothing captured";
-        if (n) badge.onclick = function (e) {
+        badge.className = "settings";
+        // Always expandable: an empty slot is exactly where someone needs to be
+        // told that capturing their own settings is possible.
+        badge.textContent = (expanded === s.id ? "\u2304 " : "\u203a ") +
+          (n ? "your settings (" + n + ")" : "using Premiere\u2019s settings");
+        badge.onclick = function (e) {
           e.stopPropagation(); expanded = (expanded === s.id) ? null : s.id; render();
         };
         body.appendChild(badge);
       }
       row.appendChild(body);
+
+      var run = document.createElement("div");
+      run.className = "iconbtn";
+      run.innerHTML = QK_ICON.play;
+      run.title = "Apply this to the selected clip right now";
+      run.onclick = function (e) {
+        e.stopPropagation();
+        runCommand(s.id, s.effect ? scriptFor(s, s) : "",
+                   s.label + (s.effect ? " (" + s.effect + ")" : ""));
+      };
+      row.appendChild(run);
 
       if (s.type !== "video") {
         var pill = document.createElement("div");
@@ -473,19 +485,11 @@
         pill.textContent = (s.type === "audio" ? "audio" : "trans");
         row.appendChild(pill);
       }
-      // Only video effects expose tunable parameters we can capture.
-      if (cfg.effect && s.type === "video") {
-        var cap = document.createElement("div");
-        cap.className = "cap"; cap.textContent = "capture";
-        cap.title = "Store the settings from the selected clip as this default";
-        cap.onclick = function(e){ e.stopPropagation(); capture(s.id, cfg.effect); };
-        row.appendChild(cap);
-      }
       // Any default can be removed, core ones included — they are only a starting
       // point. Removal is scoped to this mode; other modes keep theirs.
       var rm = document.createElement("div");
       rm.className = "rmslot"; rm.textContent = "\u00d7";
-      rm.title = "Remove from " + (m ? m.name : "this mode");
+      rm.title = "Remove this default from " + (m ? m.name : "this mode");
       rm.onclick = function (e) {
         e.stopPropagation();
         confirmThen("Remove \u201c" + s.label + "\u201d from \u201c" + (m ? m.name : "") + "\u201d?", "Remove", function () {
@@ -504,20 +508,16 @@
       row.title = "Change which effect this applies";
       row.onclick = function () { openPicker(s.id, s.effect); };
 
-      var run = document.createElement("div");
-      run.className = "runbtn";
-      run.textContent = "\u25b6";
-      run.title = "Run now on the selected clip";
-      run.onclick = function (e) {
-        e.stopPropagation();
-        runCommand(s.id, s.effect ? scriptFor(s, s) : "",
-                   s.label + (s.effect ? " (" + s.effect + ")" : ""));
-      };
-      row.insertBefore(run, row.firstChild.nextSibling);
       elList.appendChild(row);
 
-      if (expanded === s.id && cfg.params) {
+      if (expanded === s.id) {
         var det = document.createElement("div"); det.className = "details";
+        if (!cfg.params) {
+          var none = document.createElement("div");
+          none.className = "nosettings";
+          none.textContent = "This applies " + (cfg.effect || "the effect") + " exactly as Premiere ships it.";
+          det.appendChild(none);
+        }
         parseParams(cfg.params).forEach(function (kv) {
           var line = document.createElement("div"); line.className = "kv";
           var a = document.createElement("span"); a.className = "pname"; a.textContent = kv.name;
@@ -582,6 +582,20 @@
           line.appendChild(sl); line.appendChild(nb);
           det.appendChild(line);
         });
+        var grab = document.createElement("div");
+        grab.className = "capturebtn";
+        grab.textContent = cfg.params ? "Re-capture from selected clip" : "Capture from selected clip";
+        grab.onclick = function (e) { e.stopPropagation(); capture(s.id, cfg.effect); };
+        det.appendChild(grab);
+
+        var help = document.createElement("div");
+        help.className = "capturehelp";
+        help.textContent = "Set " + (cfg.effect || "the effect") +
+          " up on a clip the way you like it, keep that clip selected, then capture. " +
+          (cfg.key || "This key") + " will reuse those settings every time.";
+        help.textContent = "Set it up on a clip how you like, keep that clip selected, then capture \u2014 the shortcut will reuse those exact settings.";
+        det.appendChild(help);
+
         var clear = document.createElement("div");
         clear.className = "clearparams";
         clear.textContent = "Clear captured settings — use the effect's own defaults";
@@ -589,7 +603,7 @@
           mark("clear captured settings"); s.params = "";
           expanded = null; save(); render(); log("cleared captured settings", "ok");
         };
-        det.appendChild(clear);
+        if (cfg.params) det.appendChild(clear);
         elList.appendChild(det);
       }
     });
@@ -606,9 +620,9 @@
       var lb = document.createElement("div"); lb.className="label"; lb.textContent = a.label;
       body.appendChild(lb); row.appendChild(body);
       var arun = document.createElement("div");
-      arun.className = "runbtn";
-      arun.textContent = "\u25b6";
-      arun.title = "Run now on the selected clip";
+      arun.className = "iconbtn";
+      arun.innerHTML = QK_ICON.play;
+      arun.title = "Run this on the selected clip right now";
       arun.onclick = function (e) { e.stopPropagation(); runCommand(a.id, a.script, a.label); };
       row.appendChild(arun);
       elList.appendChild(row);
@@ -782,7 +796,10 @@
       if (ql && name.toLowerCase().indexOf(ql) === -1) return;
       var d = document.createElement("div");
       d.className = "fx" + (name === current ? " on" : "");
-      d.textContent = name;
+      var fi = document.createElement("span"); fi.className = "fxicon";
+      fi.innerHTML = qkIconFor(name, "wand");
+      var fl = document.createElement("span"); fl.textContent = name;
+      d.appendChild(fi); d.appendChild(fl);
       d.onclick = function () {
         var m = mode();
         mark("change " + pickerTarget + " effect");

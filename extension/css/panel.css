@@ -75,10 +75,12 @@ header{display:flex;justify-content:space-between;align-items:center}
 .body .sub:hover{text-decoration:underline}
 .body .sub.unset{color:var(--faint);font-style:italic}
 .cap{
-  flex:0 0 auto;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--dim);border:1px solid var(--line);border-radius:3px;padding:3px 5px;cursor:pointer;
+  flex:0 0 auto;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  color:#A8ADC6;background:var(--row-hi);border:1px solid var(--line);
+  border-radius:4px;padding:4px 8px;cursor:pointer;white-space:nowrap;
 }
-.cap:hover{color:var(--accent);border-color:var(--accent)}
+.cap:hover{color:var(--accent);border-color:var(--accent);background:var(--bg)}
+.cap.test{color:#B6BBD4}
 .cmd.active{border-color:var(--accent)}
 .dotmark{flex:0 0 6px;height:6px;border-radius:50%;background:var(--accent)}
 
@@ -193,9 +195,10 @@ header{display:flex;justify-content:space-between;align-items:center}
 .addslot{cursor:pointer;color:var(--accent)}
 .addslot:hover{text-decoration:underline}
 .rmslot{
-  flex:0 0 auto;color:var(--faint);cursor:pointer;font-size:13px;line-height:1;padding:0 3px;
+  flex:0 0 auto;color:var(--dim);cursor:pointer;font-size:16px;line-height:1;
+  padding:2px 6px;border-radius:4px;
 }
-.rmslot:hover{color:var(--bad)}
+.rmslot:hover{color:var(--bad);background:var(--row-hi)}
 .tpill{
   flex:0 0 auto;font-size:9px;letter-spacing:.06em;text-transform:uppercase;
   color:var(--faint);border:1px solid var(--line);border-radius:3px;padding:2px 4px;
@@ -218,13 +221,31 @@ header{display:flex;justify-content:space-between;align-items:center}
 }
 .hint b{color:var(--text);font-weight:600}
 
-/* ---- explicit run control ----
-   Deliberately quiet until hovered: the panel is a settings surface, and
-   touching the timeline should take intent, not a stray click. */
-.runbtn{
-  flex:0 0 auto;width:19px;height:19px;display:grid;place-items:center;
-  font-size:8px;color:var(--faint);border:1px solid transparent;border-radius:3px;
-  cursor:pointer;opacity:.35;
+
+/* ---- effect icons in the picker ---- */
+.fx{display:flex;align-items:center;gap:9px}
+.fxicon{flex:0 0 15px;height:15px;display:grid;place-items:center}
+.fxicon svg{width:15px;height:15px;fill:none;stroke:var(--accent);stroke-width:1.5;
+            stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.fx:hover .fxicon svg{opacity:1}
+.cmd .icon svg{transition:stroke .15s ease}
+
+/* ---- capture, explained where it applies ---- */
+.nosettings{font-size:11px;color:var(--dim);line-height:1.5;margin-bottom:8px}
+.capturebtn{
+  margin-top:8px;padding:7px 10px;text-align:center;cursor:pointer;
+  font-size:11.5px;font-weight:600;color:var(--accent);
+  background:var(--row-hi);border:1px solid var(--accent);border-radius:4px;
 }
-.cmd:hover .runbtn{opacity:1;border-color:var(--line)}
-.runbtn:hover{color:var(--accent);border-color:var(--accent);background:var(--row-hi)}
+.capturebtn:hover{background:var(--accent);color:#12131c}
+.capturehelp{margin-top:6px;font-size:10.5px;line-height:1.5;color:var(--faint)}
+
+/* ---- symbol controls ---- */
+.iconbtn{
+  flex:0 0 auto;width:22px;height:22px;display:grid;place-items:center;
+  border:1px solid transparent;border-radius:4px;cursor:pointer;color:var(--dim);
+}
+.iconbtn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5;
+             stroke-linecap:round;stroke-linejoin:round}
+.cmd:hover .iconbtn{border-color:var(--line);color:var(--text)}
+.iconbtn:hover{color:var(--accent);border-color:var(--accent);background:var(--row-hi)}
