@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>QuickKey</title>
+<link rel="stylesheet" href="css/panel.css">
+</head>
+<body>
+  <header>
+    <div class="brand">Quick<span>Key</span></div>
+    <div class="status"><i id="dot"></i><span id="statusText">connecting…</span></div>
+  </header>
+
+  <div class="modebar">
+    <label>Mode</label>
+    <select id="modeSelect"></select>
+    <button id="modeAdd"  title="New mode">+</button>
+    <button id="modeDel"  title="Delete this mode">&minus;</button>
+  </div>
+  <div id="modeNameWrap" class="newmode"><input id="modeName" type="text" placeholder="Name this mode, then Enter"></div>
+
+  <div id="confirmBar" class="confirmbar"></div>
+  <div id="slotAddWrap" class="newmode">
+    <input id="slotName" type="text" placeholder="Name this default, e.g. Punchy Grade">
+    <select id="slotType"></select>
+  </div>
+  <div id="list"></div>
+
+  <div class="activity">
+    <div class="activity-label">Activity</div>
+    <div id="log"></div>
+  </div>
+
+  <div id="picker" class="picker">
+    <div class="picker-head">
+      <span id="pickerTitle">Choose effect</span>
+      <button id="pickerClose">esc</button>
+    </div>
+    <input id="pickerSearch" type="text" placeholder="Search 136 effects…">
+    <div id="pickerList"></div>
+  </div>
+</body>
+<script src="js/commands.js"></script>
+<script src="js/main.js"></script>
+</html>

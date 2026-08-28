@@ -1,0 +1,26 @@
+#!/bin/bash
+# Start QuickKey. Premiere must already be running with the panel open.
+cd "$(dirname "$0")"
+pkill -f QuickKeyDaemon 2>/dev/null; sleep 0.5
+: > "$HOME/Library/Application Support/QuickKey/bridge/daemon.log"
+open daemon/QuickKeyDaemon.app
+sleep 1.5
+
+BEAT=$(python3 -c "
+import json,time
+try:
+    d=json.load(open('$HOME/Library/Application Support/QuickKey/bridge/heartbeat.json')); print(int(time.time()-d['t']/1000))
+except Exception: print(9999)")
+
+echo
+if pgrep -f QuickKeyDaemon >/dev/null; then echo "  daemon    running"; else echo "  daemon    FAILED TO START"; fi
+if [ "$BEAT" -lt 15 ]; then
+  echo "  panel     connected"
+else
+  echo "  panel     NOT CONNECTED  ->  in Premiere: Window > Extensions > QuickKey Dev"
+fi
+echo "  bindings  $(python3 -c "import json;print(len(json.load(open('$HOME/Library/Application Support/QuickKey/quickkey.json'))['bindings']))") active"
+echo
+grep -E "bindings live|!!" $HOME/Library/Application Support/QuickKey/bridge/daemon.log 2>/dev/null | sed 's/^/  /'
+echo
+echo "  stop with:  ./stop"

@@ -1,0 +1,28 @@
+#!/bin/bash
+# restore — list or roll back QuickKey config snapshots.
+#   ./restore          list snapshots
+#   ./restore <n>      restore snapshot n (1 = most recent)
+cd "$(dirname "$0")"
+D="$HOME/Library/Application Support/QuickKey/bridge/history"
+[ -d "$D" ] || { echo "no snapshots yet"; exit 1; }
+FILES=$(ls -1t "$D"/config-*.json 2>/dev/null)
+[ -z "$FILES" ] && { echo "no snapshots yet"; exit 1; }
+
+if [ -z "$1" ]; then
+  echo
+  i=1
+  while IFS= read -r f; do
+    printf "  %2d  %s   modes: %s\n" "$i" \
+      "$(date -r "$f" '+%H:%M:%S')" \
+      "$(python3 -c "import json,sys;print(', '.join(m['name'] for m in json.load(open('$f'))['modes']))" 2>/dev/null)"
+    i=$((i+1))
+  done <<< "$FILES"
+  echo
+  echo "  restore with:  ./restore <number>"
+else
+  F=$(echo "$FILES" | sed -n "${1}p")
+  [ -z "$F" ] && { echo "no snapshot $1"; exit 1; }
+  cp $HOME/Library/Application Support/QuickKey/quickkey.json "$D/config-$(date +%s)000.json" 2>/dev/null
+  cp "$F" $HOME/Library/Application Support/QuickKey/quickkey.json
+  echo "restored $(basename "$F") — reopen or reload the QuickKey panel to see it"
+fi

@@ -1,0 +1,152 @@
+#!/bin/bash
+# package — build a shareable QuickKey installer for macOS.
+set -e
+cd "$(dirname "$0")"
+EXT=extension
+OUT=dist/QuickKey
+rm -rf dist && mkdir -p "$OUT"
+
+# 1. the panel (pure HTML/JS — identical on Mac and Windows)
+cp -R "$EXT" "$OUT/com.quickkey.dev"
+rm -f "$OUT/com.quickkey.dev/.debug"        # remote debugging is a dev-only door
+
+# 2. the daemon, built for both Apple Silicon and Intel
+APP="$OUT/QuickKeyDaemon.app"
+mkdir -p "$APP/Contents/MacOS"
+cp daemon/QuickKeyDaemon.app/Contents/Info.plist "$APP/Contents/Info.plist"
+swiftc -O -target arm64-apple-macos12  -o /tmp/qkd-arm64 daemon/main.swift
+swiftc -O -target x86_64-apple-macos12 -o /tmp/qkd-x86   daemon/main.swift
+lipo -create /tmp/qkd-arm64 /tmp/qkd-x86 -output "$APP/Contents/MacOS/QuickKeyDaemon"
+rm -f /tmp/qkd-arm64 /tmp/qkd-x86
+codesign --force --sign - "$APP"
+
+# 3. installer
+cat > "$OUT/install.sh" << 'INNER'
+#!/bin/bash
+cd "$(dirname "$0")"
+echo
+echo "Installing QuickKey…"
+# Anything downloaded or messaged arrives quarantined by macOS. Clear it for the
+# whole payload up front, otherwise Gatekeeper blocks the daemon later.
+xattr -dr com.apple.quarantine . 2>/dev/null
+EXTDIR="$HOME/Library/Application Support/Adobe/CEP/extensions"
+mkdir -p "$EXTDIR"
+rm -rf "$EXTDIR/com.quickkey.dev"
+cp -R com.quickkey.dev "$EXTDIR/"
+echo "  panel installed"
+
+# CEP refuses unsigned extensions unless debug mode is on. Local, reversible.
+for v in 10 11 12 13; do defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1 2>/dev/null; done
+echo "  allowed unsigned extensions (undo: defaults write com.adobe.CSXS.12 PlayerDebugMode 0)"
+
+rm -rf "$HOME/Applications/QuickKeyDaemon.app"
+mkdir -p "$HOME/Applications"
+cp -R QuickKeyDaemon.app "$HOME/Applications/"
+xattr -dr com.apple.quarantine "$HOME/Applications/QuickKeyDaemon.app" 2>/dev/null
+echo "  hotkey daemon installed to ~/Applications"
+echo
+echo "Next:"
+echo "  1. Quit Premiere completely and reopen it."
+echo "  2. Window > Extensions > QuickKey"
+echo "  3. Open ~/Applications/QuickKeyDaemon.app  (no window — it runs in the background)"
+echo
+echo "Hotkeys are Ctrl+Option + the letter shown on each row."
+echo "To stop it:  pkill -f QuickKeyDaemon"
+echo
+read -p "Press return to close."
+INNER
+chmod +x "$OUT/install.sh"
+cp "$OUT/install.sh" "$OUT/INSTALL.command"
+chmod +x "$OUT/INSTALL.command"
+
+cat > "$OUT/README.txt" << 'INNER'
+QuickKey — prototype build
+==========================
+Turns repeated Premiere operations into single keystrokes, applied to whatever
+you have selected.
+
+Requires macOS and Premiere Pro 2024 or newer.
+
+
+INSTALL  —  use Terminal. It really is the easy path here.
+
+  1. Open Terminal (Cmd+Space, type "terminal", Enter)
+  2. Type this, INCLUDING the space at the end:   bash 
+  3. Drag install.sh from this folder onto the Terminal window
+  4. Press Enter
+
+  It installs the panel, allows unsigned extensions, and puts the daemon in
+  ~/Applications.
+
+  Then quit Premiere completely, reopen it, and choose
+  Window > Extensions > QuickKey.
+  Launch ~/Applications/QuickKeyDaemon.app — it has no window, it just runs.
+
+  DO NOT double-click the installer. This build is not signed by Apple —
+  signing needs a paid developer account we do not have yet — and macOS 15 and
+  newer removed the option to click past that warning. If you see "Apple could
+  not verify...", click Done, NOT Move to Trash, and use Terminal instead.
+  Terminal runs the identical file by a route Gatekeeper does not block.
+
+
+FIRST TRY
+  Select a clip on the timeline and press Ctrl+Option+B.
+  Select a different clip and press it again — it follows your selection.
+  That is the whole idea.
+
+
+THE PANEL
+  Key chip      Click it, then press the key you want. Backspace clears.
+  Effect name   Click to choose from every effect Premiere has.
+  CAPTURE       Set an effect up on a clip the way you like it, keep that clip
+                selected, then hit CAPTURE. Those exact settings become your
+                default. Expand "N settings captured" to see and adjust them.
+  x             Remove a default from this mode. Any of them, including the
+                ones that ship by default.
+  + add default Create your own — a second grade, an audio chain, whatever.
+
+MODES
+  A mode is a set of defaults. The same key can be Gaussian Blur in one mode
+  and Compound Blur in another. Create as many as you like and give them keys.
+  New modes start from the standard set of defaults.
+
+  Cmd+Z undoes changes made in the panel.
+
+
+WHAT SHIPS BOUND
+  Ctrl+Opt+B  blur          Ctrl+Opt+M  add marker
+  Ctrl+Opt+G  grade         Ctrl+Opt+E  toggle clip on/off
+  Ctrl+Opt+T  transition    Ctrl+Opt+F  scale to frame
+  Ctrl+Opt+A  audio effect  Ctrl+Opt+D  ripple delete
+  Ctrl+Opt+S  sharpen       Ctrl+Opt+X  strip all effects
+  Ctrl+Opt+1  switch mode
+
+  Drop Shadow, Transform, Crop and Lens Distortion are set up but unbound —
+  give them keys if you want them.
+
+
+KNOWN LIMITS — please read, these are the open questions
+  - Hotkeys need a modifier. A bare key gets swallowed system-wide by macOS
+    with no way to hand it back, so single-key bindings are refused for now.
+    Whether it is worth a permissions prompt to get real single keys is one of
+    the main things we want your opinion on.
+  - CAPTURE stores numbers and toggles only, not colours or curves. So it works
+    well for blurs and transforms, and does NOT properly capture a Lumetri
+    grade yet.
+  - Dropdown parameters show as "Option 0 / 1 / 2" unless we have recorded the
+    real names for that effect.
+  - Transitions land at the head of the selected clip.
+  - Unsigned build, and it leans on an undocumented part of Premiere. If your
+    version behaves differently, the panel's Activity box will show a red
+    error — please copy that line and send it over.
+
+
+IF SOMETHING GOES WRONG
+  pkill -f QuickKeyDaemon        stops it, releases every key immediately
+  Panel blank or disconnected?   quit and reopen Premiere
+INNER
+
+cd dist && zip -qr QuickKey-mac.zip QuickKey && cd ..
+echo
+echo "built: dist/QuickKey-mac.zip  ($(du -h dist/QuickKey-mac.zip | cut -f1))"
+lipo -archs "$APP/Contents/MacOS/QuickKeyDaemon" | sed 's/^/  daemon architectures: /'

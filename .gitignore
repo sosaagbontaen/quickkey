@@ -1,0 +1,9 @@
+# build output
+dist/
+daemon/QuickKeyDaemon.app/
+
+# local runtime state (config, logs, snapshots live in ~/Library/Application Support/QuickKey)
+.bridge/
+quickkey.json
+
+.DS_Store

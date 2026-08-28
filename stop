@@ -1,0 +1,5 @@
+#!/bin/bash
+# Stop QuickKey. Releases every bound key back to the system immediately.
+pkill -f QuickKeyDaemon 2>/dev/null
+sleep 0.5
+pgrep -f QuickKeyDaemon >/dev/null && echo "  still running?!" || echo "  QuickKey stopped — all keys released"

@@ -1,0 +1,31 @@
+#!/bin/bash
+# qk — send ExtendScript to the running Premiere via the QuickKey dev bridge.
+# usage:  ./qk 'app.version'        |  ./qk -f script.jsx
+B="$HOME/Library/Application Support/QuickKey/bridge"
+if [ "$1" = "-f" ]; then CODE=$(cat "$2"); else CODE="$1"; fi
+
+# is the panel alive?
+BEAT=$(cat "$B/heartbeat.json" 2>/dev/null)
+if [ -z "$BEAT" ]; then echo "!! bridge never started - is the QuickKey Dev panel open in Premiere?"; exit 1; fi
+AGE=$(( $(date +%s) - $(echo "$BEAT" | sed 's/.*"t":\([0-9]*\).*/\1/' | cut -c1-10) ))
+if [ "$AGE" -gt 15 ]; then echo "!! bridge stale (${AGE}s) - panel closed or Premiere busy"; exit 1; fi
+
+ID=$(date +%s%N)
+python3 -c "
+import json,sys
+json.dump({'id':'$ID','code':sys.stdin.read()},open('$B/request.json','w'))
+" <<< "$CODE"
+
+for i in $(seq 1 100); do
+  R=$(python3 -c "
+import json
+try:
+    d=json.load(open('$B/response.json'))
+    print(d['result'] if d.get('id')=='$ID' else '')
+except Exception: print('')
+" 2>/dev/null)
+  [ -n "$R" ] && { echo "$R"; exit 0; }
+  sleep 0.1
+done
+echo "!! timeout waiting for Premiere"
+exit 1

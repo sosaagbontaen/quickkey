@@ -1,0 +1,17 @@
+#!/bin/bash
+# dev-install — copy the panel source into Premiere's extension folder and
+# rebuild the daemon. Run after editing anything in extension/ or daemon/.
+set -e
+cd "$(dirname "$0")"
+DEST="$HOME/Library/Application Support/Adobe/CEP/extensions/com.quickkey.dev"
+mkdir -p "$DEST"
+rsync -a --delete --exclude '.debug' extension/ "$DEST/"
+echo "  panel  -> $DEST"
+
+APP=daemon/QuickKeyDaemon.app
+mkdir -p "$APP/Contents/MacOS"
+swiftc -O -o "$APP/Contents/MacOS/QuickKeyDaemon" daemon/main.swift
+codesign --force --sign - "$APP" >/dev/null 2>&1
+echo "  daemon -> $APP"
+echo
+echo "Reopen the QuickKey panel in Premiere to pick up panel changes."
