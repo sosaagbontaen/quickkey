@@ -26,6 +26,7 @@
   var pickerTarget = null;
   var showAllEffects = false;
   var armError = null;
+  var undoWatch = null;      // {index, label, undone, at}
   var expanded = null;      // slot id whose captured settings are shown
 
   // state.keys maps a command id -> {key,mods}. Keys are shared across modes on
@@ -459,7 +460,11 @@
       };
       row.appendChild(rm);
       row.title = "Click to run this now";
-      row.onclick = function () { runCommand(s.id, s.effect ? scriptFor(s, s) : "", s.label); };
+      // Match the label the hotkey path uses, so a toast reads the same either way.
+      row.onclick = function () {
+        runCommand(s.id, s.effect ? scriptFor(s, s) : "",
+                   s.label + (s.effect ? " (" + s.effect + ")" : ""));
+      };
       elList.appendChild(row);
 
       if (expanded === s.id && cfg.params) {
@@ -585,8 +590,44 @@
                 String(result).indexOf("ERR:") === 0 || result === "EvalScript error.";
       flash(id, bad ? "bad" : "fired");
       log(String(result).slice(0, 160), bad ? "bad" : "ok");
+      if (!bad) armUndoWatch(label);
     });
   }
+
+  // Toasts are drawn by the daemon (a panel cannot paint outside its own frame),
+  // so the panel asks for one by leaving a note in the bridge.
+  function toast(text, ok) {
+    writeFile(BRIDGE + "/toast.json", JSON.stringify({ id: String(Date.now()), text: text, ok: !!ok }));
+  }
+
+  // Premiere never tells a plugin that an undo happened, so watch its undo stack
+  // after we change something. Reading the index costs ~0.05ms, and the watch
+  // disarms itself, so this is not a standing cost.
+  function armUndoWatch(label) {
+    if (!label) return;
+    evalHost("app.enableQE(); String(qe.project.undoStackIndex())", function (r) {
+      var n = parseInt(r, 10);
+      if (n === n) undoWatch = { index: n, label: label, undone: false, at: Date.now() };
+    });
+  }
+
+  setInterval(function () {
+    if (!undoWatch) return;
+    if (Date.now() - undoWatch.at > 120000) { undoWatch = null; return; }   // stop watching eventually
+    evalHost("app.enableQE(); String(qe.project.undoStackIndex())", function (r) {
+      var n = parseInt(r, 10);
+      if (n !== n || !undoWatch) return;
+      if (!undoWatch.undone && n < undoWatch.index) {
+        undoWatch.undone = true;
+        toast("Undid " + undoWatch.label, true);
+        log("undone in Premiere: " + undoWatch.label);
+      } else if (undoWatch.undone && n >= undoWatch.index) {
+        undoWatch.undone = false;
+        toast("Redid " + undoWatch.label, true);
+        log("redone in Premiere: " + undoWatch.label);
+      }
+    });
+  }, 400);
 
   function flash(id, cls) {
     var el = document.getElementById("cmd-" + id);
@@ -826,8 +867,8 @@
       return;
     }
 
-    var hit = null;
-    buildBindings().forEach(function (b) { if (b.script === req.code) hit = b.id; });
+    var hit = null, hitLabel = null;
+    buildBindings().forEach(function (b) { if (b.script === req.code) { hit = b.id; hitLabel = b.label; } });
 
     evalHost(req.code, function (result) {
       writeFile(RES, JSON.stringify({ id:req.id, result:result, t:Date.now() }));

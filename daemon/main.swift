@@ -239,6 +239,19 @@ Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
 // The panel reports what actually happened; turn that into the toast. A binding
 // label already reads "Add Default Blur (Gaussian Blur)", which is what we want
 // on screen — the effect name matters as much as the command.
+// The panel can also ask for a toast directly — used to report an undo, which
+// Premiere performs without telling any plugin.
+var lastToastId = ""
+Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+    guard let data = FileManager.default.contents(atPath: "\(root)/bridge/toast.json"),
+          let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+          let id = j["id"] as? String, id != lastToastId,
+          let text = j["text"] as? String
+    else { return }
+    lastToastId = id
+    Toast.shared.show(text, ok: (j["ok"] as? Bool) ?? true)
+}
+
 Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
     guard let want = pending else { return }
 
