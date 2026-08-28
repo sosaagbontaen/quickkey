@@ -14,6 +14,8 @@ rm -f "$OUT/com.quickkey.dev/.debug"        # remote debugging is a dev-only doo
 APP="$OUT/QuickKeyDaemon.app"
 mkdir -p "$APP/Contents/MacOS"
 cp daemon/QuickKeyDaemon.app/Contents/Info.plist "$APP/Contents/Info.plist"
+mkdir -p "$APP/Contents/Resources"
+cp assets/build/QuickKey.icns "$APP/Contents/Resources/QuickKey.icns"
 swiftc -O -target arm64-apple-macos12  -o /tmp/qkd-arm64 daemon/main.swift
 swiftc -O -target x86_64-apple-macos12 -o /tmp/qkd-x86   daemon/main.swift
 lipo -create /tmp/qkd-arm64 /tmp/qkd-x86 -output "$APP/Contents/MacOS/QuickKeyDaemon"
@@ -24,6 +26,7 @@ codesign --force --sign - "$APP"
 #    Payload lives inside the bundle, so the whole thing is one file to send.
 INST="$OUT/Install QuickKey.app"
 mkdir -p "$INST/Contents/MacOS" "$INST/Contents/Resources"
+cp assets/build/QuickKey.icns "$INST/Contents/Resources/QuickKey.icns"
 mv "$OUT/com.quickkey.dev" "$INST/Contents/Resources/"
 cp -R "$OUT/QuickKeyDaemon.app" "$INST/Contents/Resources/"
 rm -rf "$OUT/QuickKeyDaemon.app"
@@ -39,6 +42,7 @@ cat > "$INST/Contents/Info.plist" << 'PLIST'
   <key>CFBundleExecutable</key><string>installer</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>CFBundleIconFile</key><string>QuickKey</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
 </dict>
 </plist>

@@ -5,18 +5,18 @@
 
 <style>
 :root{
-  --ground:#F1F2F4;
+  --ground:#F2F2F7;
   --surface:#FFFFFF;
-  --ink:#15171C;
-  --muted:#5B6472;
-  --faint:#8A93A1;
-  --rule:#DCDFE5;
-  --rule-strong:#C3C8D1;
-  --accent:#B06A14;
-  --accent-deep:#8A5210;
-  --accent-wash:#F6EBDA;
-  --steel:#3B5A7C;
-  --steel-wash:#E6EBF1;
+  --ink:#14142A;
+  --muted:#5A5E75;
+  --faint:#8A8DA3;
+  --rule:#DBDBE6;
+  --rule-strong:#C1C1D2;
+  --accent:#3B3BB8;
+  --accent-deep:#00005A;
+  --accent-wash:#EAEAF9;
+  --steel:#5A6172;
+  --steel-wash:#EDEEF2;
   --key-face:#FFFFFF;
   --key-edge:#C3C8D1;
 
@@ -26,37 +26,37 @@
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --ground:#131519;
-    --surface:#1B1E24;
+    --ground:#101020;
+    --surface:#191932;
     --ink:#E9EBEF;
     --muted:#9AA3B1;
     --faint:#727B8A;
-    --rule:#2B303A;
-    --rule-strong:#3B424E;
-    --accent:#DE9B41;
-    --accent-deep:#F0B96B;
-    --accent-wash:#2A2118;
-    --steel:#7FA3C9;
-    --steel-wash:#1A222C;
-    --key-face:#252A32;
-    --key-edge:#3B424E;
+    --rule:#2A2A48;
+    --rule-strong:#3A3A5E;
+    --accent:#9B9BEC;
+    --accent-deep:#BDBDF5;
+    --accent-wash:#1B1B33;
+    --steel:#9AA0B8;
+    --steel-wash:#1C1C2E;
+    --key-face:#232342;
+    --key-edge:#3A3A5E;
   }
 }
 :root[data-theme="dark"]{
-  --ground:#131519;
-  --surface:#1B1E24;
+  --ground:#101020;
+  --surface:#191932;
   --ink:#E9EBEF;
   --muted:#9AA3B1;
   --faint:#727B8A;
-  --rule:#2B303A;
-  --rule-strong:#3B424E;
-  --accent:#DE9B41;
-  --accent-deep:#F0B96B;
-  --accent-wash:#2A2118;
-  --steel:#7FA3C9;
-  --steel-wash:#1A222C;
-  --key-face:#252A32;
-  --key-edge:#3B424E;
+  --rule:#2A2A48;
+  --rule-strong:#3A3A5E;
+  --accent:#9B9BEC;
+  --accent-deep:#BDBDF5;
+  --accent-wash:#1B1B33;
+  --steel:#9AA0B8;
+  --steel-wash:#1C1C2E;
+  --key-face:#232342;
+  --key-edge:#3A3A5E;
 }
 
 *{box-sizing:border-box}
@@ -76,6 +76,8 @@ body{
 }
 
 /* ---- masthead ---- */
+.lockup{display:flex;align-items:center;gap:16px}
+.mark{width:clamp(52px,7vw,72px);height:clamp(52px,7vw,72px);display:block}
 .masthead{
   display:flex;flex-direction:column;gap:18px;
   padding-bottom:28px;
