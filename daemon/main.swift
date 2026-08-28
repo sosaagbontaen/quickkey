@@ -146,6 +146,7 @@ func carbonMods(_ mods: [String]) -> UInt32 {
 }
 
 var frontmostGate: String? = nil
+var suspended = false
 var registry: [UInt32: Binding] = [:]
 var refs: [EventHotKeyRef?] = []
 var nextID: UInt32 = 1
@@ -183,6 +184,9 @@ func unregisterAll() {
 
 func loadAndRegister() {
     unregisterAll()
+    // While the panel is capturing a shortcut it needs the raw keystroke, so we
+    // must not hold any hotkey — otherwise a bound combo can never be rebound.
+    if suspended { logLine("suspended — no hotkeys held"); return }
     guard let data = FileManager.default.contents(atPath: configPath),
           let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     else { logLine("!! cannot read quickkey.json"); return }
@@ -239,6 +243,25 @@ Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
 // The panel reports what actually happened; turn that into the toast. A binding
 // label already reads "Add Default Blur (Gaussian Blur)", which is what we want
 // on screen — the effect name matters as much as the command.
+// The panel asks us to let go of every hotkey while it is listening for one.
+// Acknowledged through a file so the panel only prompts once the keys are free.
+Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { _ in
+    let path = "\(root)/bridge/suspend.json"
+    var want = false
+    if let data = FileManager.default.contents(atPath: path),
+       let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+        want = (j["on"] as? Bool) ?? false
+    }
+    guard want != suspended else { return }
+    suspended = want
+    if suspended { unregisterAll(); logLine("hotkeys released for rebinding") }
+    else { loadAndRegister(); logLine("hotkeys restored") }
+    let ack = ["suspended": suspended]
+    if let d = try? JSONSerialization.data(withJSONObject: ack) {
+        try? d.write(to: URL(fileURLWithPath: "\(root)/bridge/suspended.json"))
+    }
+}
+
 // The panel can also ask for a toast directly — used to report an undo, which
 // Premiere performs without telling any plugin.
 var lastToastId = ""

@@ -24,9 +24,9 @@
   var listening = null;          // id awaiting a keypress
   var effectCache = {};      // per slot type
   var pickerTarget = null;
-  var showAllEffects = false;
   var armError = null;
-  var undoWatch = null;      // {index, label, undone, at}
+  var armReady = false;
+  var armTimer = null;
   var expanded = null;      // slot id whose captured settings are shown
 
   // state.keys maps a command id -> {key,mods}. Keys are shared across modes on
@@ -351,7 +351,41 @@
 
   function combo(k){
     if (!k || !k.key) return null;
-    return (k.mods||[]).map(function(x){ return {ctrl:"⌃",opt:"⌥",cmd:"⌘",shift:"⇧"}[x]||x; }).join("") + k.key;
+    // Mac modifier glyphs are hard to tell apart at this size; spell them out.
+    return (k.mods||[]).map(function(x){ return {ctrl:"Ctrl",opt:"Opt",cmd:"Cmd",shift:"Shift"}[x]||x; })
+             .concat([k.key]).join("+");
+  }
+
+  // The daemon holds these combos globally, so it would swallow the very
+  // keystroke we are trying to capture — and run that command instead. Ask it to
+  // let go first, and only prompt once it confirms.
+  function beginArming(id) {
+    listening = id; armError = null; armReady = false; render();
+    writeFile(BRIDGE + "/suspend.json", JSON.stringify({ on: true, t: Date.now() }));
+
+    var tries = 0;
+    var poll = setInterval(function () {
+      tries++;
+      var ok = false;
+      var r = readFile(BRIDGE + "/suspended.json");
+      if (r.err === 0 && r.data) { try { ok = JSON.parse(r.data).suspended === true; } catch (e) {} }
+      if (ok || tries > 25) {
+        clearInterval(poll);
+        armReady = true;
+        if (!ok) log("could not pause shortcuts — is QuickKeyDaemon running?", "bad");
+        render();
+      }
+    }, 100);
+
+    clearTimeout(armTimer);
+    armTimer = setTimeout(function () { if (listening === id) endArming(); }, 25000);
+  }
+
+  function endArming() {
+    listening = null; armReady = false; armError = null;
+    clearTimeout(armTimer);
+    writeFile(BRIDGE + "/suspend.json", JSON.stringify({ on: false, t: Date.now() }));
+    render();
   }
 
   function chipFor(id, keyObj, onAssign) {
@@ -359,9 +393,12 @@
     var t = combo(keyObj);
     c.className = "chip" + (t ? "" : " empty") + (listening === id ? " arming" : "");
     // An empty slot said "—", which reads as "none" rather than "click me".
-    c.textContent = listening === id ? "press…" : (t || "set key");
+    c.textContent = (listening === id) ? (armReady ? "press…" : "wait…") : (t || "set key");
     c.title = "Click, then hold Ctrl/Opt and press a key. Backspace clears it.";
-    c.onclick = function(e){ e.stopPropagation(); listening = (listening===id?null:id); render(); };
+    c.onclick = function(e){
+      e.stopPropagation();
+      if (listening === id) endArming(); else beginArming(id);
+    };
     return c;
   }
 
@@ -409,7 +446,8 @@
       var sub = document.createElement("div");
       sub.className = "sub" + (cfg.effect ? "" : " unset");
       sub.textContent = (listening === s.id)
-        ? (armError || "hold \u2303 \u2325 and press a key\u2026")
+        ? (armError || (armReady ? "hold Control and Option, then press a key"
+                                 : "pausing shortcuts\u2026"))
         : (cfg.effect || "choose an effect\u2026");
       if (listening === s.id) sub.className = "sub arming" + (armError ? " err" : "");
       sub.onclick = function(e){ e.stopPropagation(); openPicker(s.id, cfg.effect); };
@@ -590,7 +628,6 @@
                 String(result).indexOf("ERR:") === 0 || result === "EvalScript error.";
       flash(id, bad ? "bad" : "fired");
       log(String(result).slice(0, 160), bad ? "bad" : "ok");
-      if (!bad) armUndoWatch(label);
     });
   }
 
@@ -599,35 +636,6 @@
   function toast(text, ok) {
     writeFile(BRIDGE + "/toast.json", JSON.stringify({ id: String(Date.now()), text: text, ok: !!ok }));
   }
-
-  // Premiere never tells a plugin that an undo happened, so watch its undo stack
-  // after we change something. Reading the index costs ~0.05ms, and the watch
-  // disarms itself, so this is not a standing cost.
-  function armUndoWatch(label) {
-    if (!label) return;
-    evalHost("app.enableQE(); String(qe.project.undoStackIndex())", function (r) {
-      var n = parseInt(r, 10);
-      if (n === n) undoWatch = { index: n, label: label, undone: false, at: Date.now() };
-    });
-  }
-
-  setInterval(function () {
-    if (!undoWatch) return;
-    if (Date.now() - undoWatch.at > 120000) { undoWatch = null; return; }   // stop watching eventually
-    evalHost("app.enableQE(); String(qe.project.undoStackIndex())", function (r) {
-      var n = parseInt(r, 10);
-      if (n !== n || !undoWatch) return;
-      if (!undoWatch.undone && n < undoWatch.index) {
-        undoWatch.undone = true;
-        toast("Undid " + undoWatch.label, true);
-        log("undone in Premiere: " + undoWatch.label);
-      } else if (undoWatch.undone && n >= undoWatch.index) {
-        undoWatch.undone = false;
-        toast("Redid " + undoWatch.label, true);
-        log("redone in Premiere: " + undoWatch.label);
-      }
-    });
-  }, 400);
 
   function flash(id, cls) {
     var el = document.getElementById("cmd-" + id);
@@ -712,10 +720,11 @@
     pickerTarget = slotId;
     var slot = slotById(slotId);
     var type = slot ? slot.type : "video";
-    showAllEffects = false;
     document.getElementById("pickerTitle").textContent = "Effect for " + (slot ? slot.label : slotId);
     document.getElementById("picker").className = "picker show";
-    var box = document.getElementById("pickerSearch"); box.value = ""; box.focus();
+    // Deliberately not focused: with the caret in the search box, Backspace
+    // would edit text instead of going back.
+    var box = document.getElementById("pickerSearch"); box.value = ""; box.blur();
 
     if (effectCache[type]) return drawPicker("", current);
     document.getElementById("pickerList").innerHTML = "<div class='fx'>loading…</div>";
@@ -740,19 +749,19 @@
     // A "default blur" slot should open on the blurs, not on 136 effects the
     // user has to know the name of. Searching still reaches everything.
     var meta = slot ? (templateFor(slot.id) || slot) : null;
-    var rx = (meta && meta.match && !showAllEffects && !ql) ? new RegExp(meta.match, "i") : null;
+    // A blur slot only ever wants blurs. Scope the list to the family and search
+    // within it, rather than making the user wade through 136 effects.
+    var rx = (meta && meta.match) ? new RegExp(meta.match, "i") : null;
     var shown = rx ? all.filter(function (n) { return rx.test(n); }) : all;
     if (rx && !shown.length) { shown = all; rx = null; }
 
-    if (meta && meta.match && !ql) {
+    if (rx) {
       var bar = document.createElement("div");
       bar.className = "fxfilter";
-      bar.textContent = rx
-        ? (meta.family || "Matching") + " (" + shown.length + ")  ·  show all " + all.length + " effects"
-        : "showing all " + all.length + " effects  ·  back to " + (meta.family || "matching");
-      bar.onclick = function () { showAllEffects = !showAllEffects; drawPicker("", current); };
+      bar.textContent = (meta.family || "Matching") + " \u00b7 " + shown.length;
       list.appendChild(bar);
     }
+
 
     shown.forEach(function (name) {
       if (ql && name.toLowerCase().indexOf(ql) === -1) return;
@@ -774,6 +783,17 @@
     if (!list.children.length) list.innerHTML = "<div class='fx'>no match</div>";
   }
   function closePicker(){ document.getElementById("picker").className = "picker"; pickerTarget = null; }
+
+  // Esc alone was too easy to miss. Backspace goes back too, which is safe now
+  // that the search box does not take focus when the picker opens.
+  document.addEventListener("keydown", function (e) {
+    if (!pickerTarget) return;
+    if (document.activeElement === document.getElementById("pickerSearch")) return;
+    if (e.key === "Backspace" || e.key === "Escape") {
+      e.preventDefault(); e.stopPropagation(); closePicker();
+    }
+  }, true);
+
   document.getElementById("pickerClose").onclick = closePicker;
   document.getElementById("pickerSearch").oninput = function(){
     var m = mode(); drawPicker(this.value, m && m.slots[pickerTarget] ? m.slots[pickerTarget].effect : "");
@@ -808,7 +828,7 @@
     }
     if (!listening) return;
     e.preventDefault(); e.stopPropagation();
-    if (e.key === "Escape") { listening = null; render(); return; }
+    if (e.key === "Escape") { endArming(); return; }
     if (["Shift","Control","Alt","Meta"].indexOf(e.key) !== -1) return;
 
     var target = listening;
@@ -832,7 +852,7 @@
       if (mods.length === 0) {
         // Previously this only went to the log, so it looked like nothing
         // happened at all. Say it on the row, and stay armed for another try.
-        armError = "needs \u2303 or \u2325 \u2014 try again";
+        armError = "that key needs Control or Option \u2014 try again";
         log("shortcuts need a modifier: hold Ctrl or Option, then the key", "bad");
         render();
         return;
@@ -843,9 +863,9 @@
       } else {
         state.keys[target] = { key:k, mods:mods };
       }
-      log("bound " + mods.map(function(x){return {ctrl:"⌃",opt:"⌥",cmd:"⌘",shift:"⇧"}[x];}).join("") + k, "ok");
+      log("bound " + combo({ key: k, mods: mods }), "ok");
     }
-    listening = null; save(); render();
+    save(); endArming();
   }, true);
 
   // ---------- bridge ----------
