@@ -259,10 +259,12 @@ header{display:flex;justify-content:space-between;align-items:center}
 /* ---- help ---- */
 /* The help toggle has to be findable after it is dismissed, so it carries the
    accent rather than sitting quietly in the header greys. */
+/* A word, not a glyph. "?" has to be decoded; "Help" does not, and it removes
+   the need for any pointer explaining what the "?" was. */
 #helpBtn{
-  width:20px;height:20px;margin-left:8px;border-radius:50%;cursor:pointer;flex:0 0 auto;
+  margin-left:9px;padding:3px 9px;border-radius:11px;cursor:pointer;flex:0 0 auto;
   background:var(--row-hi);border:1px solid var(--accent);color:var(--accent);
-  font:700 12px/1 -apple-system,sans-serif;padding:0;
+  font:600 10.5px/1.4 -apple-system,sans-serif;letter-spacing:.03em;
 }
 #helpBtn:hover{background:var(--accent);color:#12131c}
 .help{display:none}
@@ -305,24 +307,6 @@ header{display:flex;justify-content:space-between;align-items:center}
 }
 .setbtn:hover{background:var(--accent-hi)}
 
-/* ---- one-time pointer to the help button ---- */
-.helppointer{
-  display:none;position:fixed;z-index:40;
-  padding:5px 10px;border-radius:5px;
-  background:var(--accent);color:#12131c;
-  font:600 11px/1 -apple-system,sans-serif;
-  box-shadow:0 4px 14px rgba(0,0,0,.45);
-}
-.helppointer::before{
-  content:"";position:absolute;top:-4px;left:13px;
-  width:8px;height:8px;background:var(--accent);transform:rotate(45deg);
-}
-.helppointer.show{display:block;opacity:1;transition:opacity .25s ease}
-.helppointer.fade{display:block;opacity:0;transition:opacity .8s ease}
-@media (prefers-reduced-motion:reduce){
-  .helppointer.show,.helppointer.fade{transition:none}
-}
 .pickerhint{
   flex:0 0 auto;font-size:10px;color:var(--faint);letter-spacing:.03em;white-space:nowrap;
 }
-.helppointer{cursor:pointer}

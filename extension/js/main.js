@@ -187,7 +187,6 @@
           });
           state.modes = j.modes;
           state.helpSeen = !!j.helpSeen;
-          state.helpPointerSeen = !!j.helpPointerSeen;
           state.activeMode = j.activeMode || j.modes[0].id;
           state.keys = j.keys || {};
           return;
@@ -268,7 +267,6 @@
 
   function save() {
     var out = { onlyWhenFrontmost:GATE, activeMode:state.activeMode, helpSeen:!!state.helpSeen,
-                helpPointerSeen:!!state.helpPointerSeen,
                 modes:state.modes, keys:state.keys, bindings:buildBindings() };
     var json = JSON.stringify(out, null, 2);
     if (writeFile(CONFIG, json).err !== 0) log("could not write config", "bad");
@@ -318,25 +316,6 @@
   // Shown once, when the help card is first dismissed — the only moment the "?"
   // is genuinely ambiguous. A standing badge would tax attention forever to say
   // something the user needs once, which is the anti-pattern worth avoiding.
-  function pointAtHelp() {
-    if (state.helpPointerSeen) return;
-    state.helpPointerSeen = true; save();
-
-    var p = document.getElementById("helpPointer");
-    var b = document.getElementById("helpBtn").getBoundingClientRect();
-    // Measured, not hard-coded: the button shifts once the wordmark font loads.
-    p.style.left = Math.round(b.left + b.width / 2 - 17) + "px";
-    p.style.top  = Math.round(b.bottom + 7) + "px";
-    p.onclick = hideHelpPointer;
-    p.className = "helppointer show";
-
-    while (pointerTimers.length) clearTimeout(pointerTimers.pop());
-    pointerTimers.push(setTimeout(function () {
-      if (p.className.indexOf("show") !== -1) p.className = "helppointer fade";
-    }, 3500));
-    pointerTimers.push(setTimeout(hideHelpPointer, 4400));
-  }
-
   function renderHelp() {
     var el = document.getElementById("help");
     el.innerHTML = "";
@@ -354,14 +333,14 @@
     close.className = "helpclose";
     close.textContent = "Got it";
     close.onclick = function () {
-      helpOpen = false; state.helpSeen = true; save(); renderHelp(); pointAtHelp();
+      helpOpen = false; state.helpSeen = true; save(); renderHelp();
     };
     el.appendChild(close);
   }
 
   document.getElementById("helpBtn").onclick = function () {
     helpOpen = !helpOpen;
-    if (!helpOpen) { state.helpSeen = true; save(); renderHelp(); pointAtHelp(); return; }
+    if (!helpOpen) { state.helpSeen = true; save(); renderHelp(); return; }
     renderHelp();
   };
 
@@ -454,7 +433,6 @@
   // keystroke we are trying to capture — and run that command instead. Ask it to
   // let go first, and only prompt once it confirms.
   function beginArming(id) {
-    hideHelpPointer();
     listening = id; armError = null; armReady = false; render();
     // Give the view something focusable, or real keystrokes never arrive.
     var el = document.getElementById("cmd-" + id);
@@ -858,7 +836,6 @@
 
   // ---------- modes ----------
   function switchMode(id) {
-    hideHelpPointer();
     if (state.activeMode === id) return;
     state.activeMode = id;
     save();                      // rewrites bindings; daemon reloads within ~1s
@@ -928,20 +905,7 @@
   };
 
   // ---------- effect picker ----------
-  var pointerTimers = [];
-
-  function hideHelpPointer() {
-    while (pointerTimers.length) clearTimeout(pointerTimers.pop());
-    var p = document.getElementById("helpPointer");
-    if (p) p.className = "helppointer";
-  }
-
-  // Dismiss on any interaction, not only on the timer — a note that outlives
-  // the moment it explains becomes clutter.
-  document.addEventListener("mousedown", function () { hideHelpPointer(); }, true);
-
   function openPicker(slotId, current) {
-    hideHelpPointer();
     pickerTarget = slotId;
     var slot = slotById(slotId);
     var type = slot ? slot.type : "video";
