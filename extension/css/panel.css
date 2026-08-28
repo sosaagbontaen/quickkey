@@ -192,3 +192,20 @@ header{display:flex;justify-content:space-between;align-items:center}
   flex:0 0 auto;font-size:9px;letter-spacing:.06em;text-transform:uppercase;
   color:var(--faint);border:1px solid var(--line);border-radius:3px;padding:2px 4px;
 }
+
+/* ---- picker family filter ---- */
+.fxfilter{
+  padding:6px 8px;margin-bottom:4px;font-size:11px;color:var(--accent);
+  border:1px dashed var(--line);border-radius:3px;cursor:pointer;text-align:center;
+}
+.fxfilter:hover{border-color:var(--accent);background:var(--row)}
+
+/* ---- key assignment affordance ---- */
+.chip.empty{font-size:9px;letter-spacing:.04em;padding:0 5px}
+.chip.arming{border-color:var(--accent);color:var(--accent);border-style:solid}
+.sub.arming{color:var(--accent)}
+.sub.arming.err{color:var(--bad)}
+.hint{
+  margin:9px 0 0;font-size:11px;color:var(--dim);line-height:1.4;
+}
+.hint b{color:var(--text);font-weight:600}

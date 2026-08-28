@@ -22,15 +22,15 @@ var QK_ICON = {
 // host command runs: a transition attaches to an edit, an audio effect needs an
 // audio clip, and only video effects support captured parameters.
 var QK_SLOTS = [
-  { id:"blur",       label:"Add Default Blur",       icon:"blur",   type:"video",      defaultKey:"B", fallback:"Gaussian Blur" },
-  { id:"grade",      label:"Add Default Grade",      icon:"grade",  type:"video",      defaultKey:"G", fallback:"Lumetri Color" },
+  { id:"blur",       label:"Add Default Blur",       icon:"blur",   type:"video",      defaultKey:"B", fallback:"Gaussian Blur", match:"blur", family:"Blurs" },
+  { id:"grade",      label:"Add Default Grade",      icon:"grade",  type:"video",      defaultKey:"G", fallback:"Lumetri Color", match:"lumetri|color|curve|level|tint|tone|balance|equaliz", family:"Colour" },
   { id:"transition", label:"Add Default Transition", icon:"trans",  type:"transition", defaultKey:"T", fallback:"Cross Dissolve" },
   { id:"audiofx",    label:"Add Default Audio FX",   icon:"audio",  type:"audio",      defaultKey:"A", fallback:"Parametric Equalizer" },
-  { id:"sharpen",    label:"Add Sharpen",            icon:"sharp",  type:"video",      defaultKey:"S", fallback:"Sharpen" },
-  { id:"dropshadow", label:"Add Drop Shadow",        icon:"shadow", type:"video",      defaultKey:"",  fallback:"Drop Shadow" },
-  { id:"transform",  label:"Add Transform",          icon:"xform",  type:"video",      defaultKey:"",  fallback:"Transform" },
-  { id:"crop",       label:"Add Crop",               icon:"crop",   type:"video",      defaultKey:"",  fallback:"Crop" },
-  { id:"lens",       label:"Add Lens Distortion",    icon:"lens",   type:"video",      defaultKey:"",  fallback:"Lens Distortion" }
+  { id:"sharpen",    label:"Add Sharpen",            icon:"sharp",  type:"video",      defaultKey:"S", fallback:"Sharpen", match:"sharpen|unsharp", family:"Sharpen" },
+  { id:"dropshadow", label:"Add Drop Shadow",        icon:"shadow", type:"video",      defaultKey:"",  fallback:"Drop Shadow", match:"shadow|bevel|glow", family:"Shadow" },
+  { id:"transform",  label:"Add Transform",          icon:"xform",  type:"video",      defaultKey:"",  fallback:"Transform", match:"transform|scale|rotat|position|mirror|offset", family:"Transform" },
+  { id:"crop",       label:"Add Crop",               icon:"crop",   type:"video",      defaultKey:"",  fallback:"Crop", match:"crop|mask|garbage|matte", family:"Crop" },
+  { id:"lens",       label:"Add Lens Distortion",    icon:"lens",   type:"video",      defaultKey:"",  fallback:"Lens Distortion", match:"lens|distort|warp|spheriz|wave|ripple", family:"Distortion" }
 ];
 
 var QK_SLOT_TYPES = [

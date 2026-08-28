@@ -24,6 +24,8 @@
   var listening = null;          // id awaiting a keypress
   var effectCache = {};      // per slot type
   var pickerTarget = null;
+  var showAllEffects = false;
+  var armError = null;
   var expanded = null;      // slot id whose captured settings are shown
 
   // state.keys maps a command id -> {key,mods}. Keys are shared across modes on
@@ -73,7 +75,12 @@
     for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i];
     return null;
   }
-  function slotCfg(slot) { return slot; }
+  // Slots stored in a mode carry only what varies (effect, params). Static
+  // metadata such as the effect-family filter lives in the template.
+  function templateFor(id) {
+    for (var i = 0; i < QK_SLOTS.length; i++) if (QK_SLOTS[i].id === id) return QK_SLOTS[i];
+    return null;
+  }
   function scriptFor(slot, cfg) {
     if (slot.type === "audio")      return "qkApplyAudioEffect(" + JSON.stringify(cfg.effect) + ")";
     if (slot.type === "transition") return "qkApplyTransition("  + JSON.stringify(cfg.effect) + ")";
@@ -349,9 +356,10 @@
   function chipFor(id, keyObj, onAssign) {
     var c = document.createElement("div");
     var t = combo(keyObj);
-    c.className = "chip" + (t ? "" : " empty");
-    c.textContent = listening === id ? "?" : (t || "—");
-    c.title = "Click, then press a key. Backspace clears.";
+    c.className = "chip" + (t ? "" : " empty") + (listening === id ? " arming" : "");
+    // An empty slot said "—", which reads as "none" rather than "click me".
+    c.textContent = listening === id ? "press…" : (t || "set key");
+    c.title = "Click, then hold Ctrl/Opt and press a key. Backspace clears it.";
     c.onclick = function(e){ e.stopPropagation(); listening = (listening===id?null:id); render(); };
     return c;
   }
@@ -399,7 +407,10 @@
       var lb = document.createElement("div"); lb.className = "label"; lb.textContent = s.label;
       var sub = document.createElement("div");
       sub.className = "sub" + (cfg.effect ? "" : " unset");
-      sub.textContent = cfg.effect || "choose an effect…";
+      sub.textContent = (listening === s.id)
+        ? (armError || "hold \u2303 \u2325 and press a key\u2026")
+        : (cfg.effect || "choose an effect\u2026");
+      if (listening === s.id) sub.className = "sub arming" + (armError ? " err" : "");
       sub.onclick = function(e){ e.stopPropagation(); openPicker(s.id, cfg.effect); };
       body.appendChild(lb); body.appendChild(sub);
 
@@ -660,6 +671,7 @@
     pickerTarget = slotId;
     var slot = slotById(slotId);
     var type = slot ? slot.type : "video";
+    showAllEffects = false;
     document.getElementById("pickerTitle").textContent = "Effect for " + (slot ? slot.label : slotId);
     document.getElementById("picker").className = "picker show";
     var box = document.getElementById("pickerSearch"); box.value = ""; box.focus();
@@ -682,7 +694,26 @@
     var ql = q.toLowerCase();
     var slot = slotById(pickerTarget);
     var type = slot ? slot.type : "video";
-    (effectCache[type] || []).forEach(function (name) {
+    var all = effectCache[type] || [];
+
+    // A "default blur" slot should open on the blurs, not on 136 effects the
+    // user has to know the name of. Searching still reaches everything.
+    var meta = slot ? (templateFor(slot.id) || slot) : null;
+    var rx = (meta && meta.match && !showAllEffects && !ql) ? new RegExp(meta.match, "i") : null;
+    var shown = rx ? all.filter(function (n) { return rx.test(n); }) : all;
+    if (rx && !shown.length) { shown = all; rx = null; }
+
+    if (meta && meta.match && !ql) {
+      var bar = document.createElement("div");
+      bar.className = "fxfilter";
+      bar.textContent = rx
+        ? (meta.family || "Matching") + " (" + shown.length + ")  ·  show all " + all.length + " effects"
+        : "showing all " + all.length + " effects  ·  back to " + (meta.family || "matching");
+      bar.onclick = function () { showAllEffects = !showAllEffects; drawPicker("", current); };
+      list.appendChild(bar);
+    }
+
+    shown.forEach(function (name) {
       if (ql && name.toLowerCase().indexOf(ql) === -1) return;
       var d = document.createElement("div");
       d.className = "fx" + (name === current ? " on" : "");
@@ -740,6 +771,7 @@
     if (["Shift","Control","Alt","Meta"].indexOf(e.key) !== -1) return;
 
     var target = listening;
+    armError = null;
     mark("rebind key");
     if (e.key === "Backspace" || e.key === "Delete") {
       if (target.indexOf("mode:") === 0) {
@@ -756,7 +788,14 @@
       if (k.length !== 1 && !/^F\d$/.test(k)) { log("unsupported key: " + e.key, "bad"); return; }
       // A modifier-less hotkey is consumed system-wide and cannot be handed back,
       // which kills that key in every other app. Refuse until we have an event tap.
-      if (mods.length === 0) { log("bare keys disabled — hold ctrl/opt/cmd", "bad"); return; }
+      if (mods.length === 0) {
+        // Previously this only went to the log, so it looked like nothing
+        // happened at all. Say it on the row, and stay armed for another try.
+        armError = "needs \u2303 or \u2325 \u2014 try again";
+        log("shortcuts need a modifier: hold Ctrl or Option, then the key", "bad");
+        render();
+        return;
+      }
 
       if (target.indexOf("mode:") === 0) {
         state.modes.forEach(function(m){ if ("mode:"+m.id===target){ m.key=k; m.mods=mods; } });

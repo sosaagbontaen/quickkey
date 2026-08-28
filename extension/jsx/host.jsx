@@ -39,11 +39,31 @@ $.global.qkOfKind = function (hits, kind) {
     return out;
 };
 
+// Locating the same clip in the QE DOM is the sharpest edge in this codebase.
+// QE tracks include empty gaps as items; the public DOM's clips collection does
+// not. So the two collections share no index space the moment a timeline has a
+// gap anywhere before the clip, and index-based lookup silently targets a
+// neighbour. Match on timeline position instead, confirmed by name.
 $.global.qkQEItem = function (hit) {
     app.enableQE();
     var qs = qe.project.getActiveSequence();
-    return hit.kind === "audio" ? qs.getAudioTrackAt(hit.track).getItemAt(hit.index)
-                                : qs.getVideoTrackAt(hit.track).getItemAt(hit.index);
+    var track = (hit.kind === "audio") ? qs.getAudioTrackAt(hit.track)
+                                       : qs.getVideoTrackAt(hit.track);
+    var want = hit.clip.start.seconds;
+    var EPS = 0.02;                       // a couple of frames of tolerance
+
+    var named = null, positional = null, bestDiff = EPS;
+    for (var i = 0; i < track.numItems; i++) {
+        var it = track.getItemAt(i), st;
+        try { st = parseFloat(it.start.secs); } catch (e) { continue; }
+        if (st !== st) continue;
+        var d = Math.abs(st - want);
+        if (d > EPS) continue;
+        if (it.name === hit.name && named === null) named = it;
+        if (d <= bestDiff) { bestDiff = d; positional = it; }
+    }
+    // Name agreement is the strongest signal; position alone still beats index.
+    return named || positional || track.getItemAt(hit.index);
 };
 
 $.global.qkApplyEffect = function (effectName) {
@@ -195,9 +215,11 @@ $.global.qkApplyPreset = function (effectName, paramStr) {
 
     var hits = qkOfKind(f.hits, "video");
     if (!hits.length) return "ERR: select a video clip";
-    var applied = 0, tuned = 0;
+    var applied = 0, tuned = 0, failed = [];
     for (var h = 0; h < hits.length; h++) {
-        if (!qkQEItem(hits[h]).addVideoEffect(fx)) continue;
+        var item = qkQEItem(hits[h]);
+        if (!item || !item.name) { failed.push(hits[h].name + " (could not locate it on the track)"); continue; }
+        if (!item.addVideoEffect(fx)) { failed.push(hits[h].name + " (Premiere refused the effect)"); continue; }
         applied++;
         if (!paramStr) continue;
 
@@ -224,8 +246,10 @@ $.global.qkApplyPreset = function (effectName, paramStr) {
             }
         }
     }
-    if (!applied) return "ERR: nothing applied";
-    return "OK: " + effectName + " -> " + applied + " clip(s)" + (tuned ? " (" + tuned + " params set)" : "");
+    if (!applied) return "ERR: " + effectName + " not applied \u2014 " + failed.join("; ");
+    var msg = "OK: " + effectName + " -> " + applied + " clip(s)" + (tuned ? " (" + tuned + " params set)" : "");
+    if (failed.length) msg += "  [skipped: " + failed.join("; ") + "]";
+    return msg;
 };
 
 // Premiere never reports a parameter's range, but it does clamp: write a value
