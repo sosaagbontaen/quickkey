@@ -187,6 +187,7 @@
           });
           state.modes = j.modes;
           state.helpSeen = !!j.helpSeen;
+          state.seeded = j.seeded || [];
           state.activeMode = j.activeMode || j.modes[0].id;
           state.keys = j.keys || {};
           return;
@@ -206,6 +207,24 @@
   // Drop any slot id that is not in the catalogue (an earlier bug could write one).
   // Rewrite any stored params that still carry internal properties, so they are
   // removed from the file rather than just hidden in the UI.
+  // A command added in a newer build has no key in an existing config. Give it
+  // its default once, recording that we did — otherwise a key the user cleared
+  // on purpose would come back on every launch.
+  function seedNewActions() {
+    state.seeded = state.seeded || [];
+    var added = [];
+    QK_ACTIONS.forEach(function (a) {
+      if (!a.defaultKey) return;
+      var known = false;
+      for (var i = 0; i < state.seeded.length; i++) if (state.seeded[i] === a.id) known = true;
+      if (known || state.keys[a.id]) { if (!known) state.seeded.push(a.id); return; }
+      state.keys[a.id] = { key: a.defaultKey, mods: QK_DEFAULT_MODS.slice() };
+      state.seeded.push(a.id);
+      added.push(a.label);
+    });
+    if (added.length) log("new command: " + added.join(", "), "ok");
+  }
+
   function scrubParams() {
     var n = 0;
     state.modes.forEach(function (m) {
@@ -267,6 +286,7 @@
 
   function save() {
     var out = { onlyWhenFrontmost:GATE, activeMode:state.activeMode, helpSeen:!!state.helpSeen,
+                seeded:state.seeded || [],
                 modes:state.modes, keys:state.keys, bindings:buildBindings() };
     var json = JSON.stringify(out, null, 2);
     if (writeFile(CONFIG, json).err !== 0) log("could not write config", "bad");
@@ -1120,7 +1140,7 @@
   };
 
   // ---------- boot ----------
-  loadConfig(); scrubParams(); save();
+  loadConfig(); seedNewActions(); scrubParams(); save();
   helpOpen = !state.helpSeen;   // first run explains itself
   renderHelp(); render();
   evalHost("$.evalFile(File(" + JSON.stringify(HOSTJSX) + ")); app.setExtensionPersistent('com.quickkey.dev.panel',1); 'ready ' + app.version",
