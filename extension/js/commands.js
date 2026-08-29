@@ -45,7 +45,8 @@ var QK_ACTIONS = [
   { id: "enable", label: "Toggle Clip On/Off", icon: "eye",    defaultKey: "E", script: 'qkToggleEnabled()' },
   { id: "fit",    label: "Scale to Frame",     icon: "frame",  defaultKey: "F", script: 'qkScaleToFrame()' },
   { id: "ripple", label: "Ripple Delete",      icon: "cut",    defaultKey: "D", script: 'qkRippleDelete()' },
-  { id: "strip",  label: "Strip All Effects",  icon: "strip",  defaultKey: "X", script: 'qkStripEffects()' }
+  { id: "strip",  label: "Strip All Effects",  icon: "strip",  defaultKey: "X", script: 'qkStripEffects()' },
+  { id: "unnest", label: "Un-nest Sequence",     icon: "unnest", defaultKey: "U", script: 'qkUnnest()' }
 ];
 
 var QK_DEFAULT_MODS = ["ctrl", "opt"];
@@ -126,3 +127,7 @@ function qkIconFor(effectName, fallback) {
 // tools already use for "sample this from the source".
 QK_ICON.play = '<svg viewBox="0 0 16 16"><path d="M5 3.4 12.4 8 5 12.6z" fill="currentColor" stroke="none"/></svg>';
 QK_ICON.pick = '<svg viewBox="0 0 16 16"><path d="M13.6 2.4a1.9 1.9 0 0 0-2.7 0l-1.2 1.2-.7-.7-1.1 1.1.7.7-5 5V13h2.6l5-5 .7.7 1.1-1.1-.7-.7 1.3-1.2a1.9 1.9 0 0 0 0-2.7z"/></svg>';
+
+// Nested boxes opening outward — Premiere has no unnest command, so no existing
+// icon to borrow.
+QK_ICON.unnest = '<svg viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="5" height="5" rx="1"/><path d="M3 6V3h3M13 6V3h-3M3 10v3h3M13 10v3h-3"/></svg>';

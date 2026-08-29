@@ -334,4 +334,104 @@ $.global.qkListTransitions = function () {
     return o.join("|");
 };
 
+// ---------------------------------------------------------------------------
+// Un-nest.
+//
+// Premiere can nest a sequence but offers no way back; the manual route is to
+// open the nest, copy, delete, and paste. There is no unnest command to call,
+// so this rebuilds the contents in place.
+//
+// The one non-obvious mechanic: a track item's inPoint/outPoint can be set, but
+// setting them does not retime the clip on the timeline. The source project
+// item's in/out must be set BEFORE overwriteClip, so the clip arrives already
+// the right length. Those are restored afterwards.
+// ---------------------------------------------------------------------------
+
+$.global.qkFindSequenceFor = function (projectItem) {
+    for (var i = 0; i < app.project.sequences.numSequences; i++) {
+        var s = app.project.sequences[i];
+        if (s.projectItem && s.projectItem.nodeId === projectItem.nodeId) return s;
+    }
+    return null;
+};
+
+$.global.qkUnnest = function () {
+    var f = qkFindSelected();
+    if (f.err) return "ERR: " + f.err;
+    var hits = qkOfKind(f.hits, "video");
+    if (!hits.length) return "ERR: select a nested sequence on a video track";
+
+    var hit = hits[0], nest = hit.clip;
+    if (!nest.projectItem || !nest.projectItem.isSequence())
+        return "ERR: \u201c" + nest.name + "\u201d is not a nested sequence";
+
+    var src = qkFindSequenceFor(nest.projectItem);
+    if (!src) return "ERR: could not find the sequence behind this nest";
+
+    var seq = app.project.activeSequence;
+    var nestStart = nest.start.seconds,
+        nestEnd   = nest.end.seconds,
+        nestIn    = nest.inPoint.seconds;
+
+    // Work out every placement before touching the timeline.
+    var plan = [], skipped = 0;
+    for (var t = 0; t < src.videoTracks.numTracks; t++) {
+        var clips = src.videoTracks[t].clips;
+        for (var j = 0; j < clips.numItems; j++) {
+            var ic = clips[j];
+            var ts = nestStart + (ic.start.seconds - nestIn);
+            var te = nestStart + (ic.end.seconds - nestIn);
+            // A trimmed nest hides part of its contents; do not resurrect it.
+            if (te <= nestStart + 0.001 || ts >= nestEnd - 0.001) { skipped++; continue; }
+            var headTrim = (ts < nestStart) ? (nestStart - ts) : 0;
+            var tailTrim = (te > nestEnd) ? (te - nestEnd) : 0;
+            plan.push({
+                track: hit.track + t,
+                pi:    ic.projectItem,
+                at:    ts + headTrim,
+                inP:   ic.inPoint.seconds + headTrim,
+                outP:  ic.outPoint.seconds - tailTrim,
+                name:  ic.name
+            });
+        }
+    }
+    if (!plan.length) return "ERR: that nest has nothing on its video tracks";
+
+    // Count only tracks that actually carry something: a nest routinely has
+    // empty upper tracks, and requiring room for those would refuse needlessly.
+    var needed = 0;
+    for (var q = 0; q < plan.length; q++) if (plan[q].track + 1 > needed) needed = plan[q].track + 1;
+    if (needed > seq.videoTracks.numTracks)
+        return "ERR: this nest needs " + needed + " video tracks and the sequence has " +
+               seq.videoTracks.numTracks + ". Add " + (needed - seq.videoTracks.numTracks) + " and try again.";
+
+    // Remove the nest first so its space is free to write into.
+    qkQEItem(hit).remove(false, false);
+
+    var placed = 0, failed = [];
+    for (var p = 0; p < plan.length; p++) {
+        var item = plan[p];
+        var keepIn = null, keepOut = null;
+        try { keepIn = item.pi.getInPoint(); keepOut = item.pi.getOutPoint(); } catch (e) {}
+        try {
+            item.pi.setInPoint(item.inP, 4);
+            item.pi.setOutPoint(item.outP, 4);
+            seq.videoTracks[item.track].overwriteClip(item.pi, item.at);
+            placed++;
+        } catch (e) {
+            failed.push(item.name);
+        }
+        // Leave the source clip's in/out as we found it.
+        try {
+            if (keepIn !== null)  item.pi.setInPoint(keepIn.seconds, 4);
+            if (keepOut !== null) item.pi.setOutPoint(keepOut.seconds, 4);
+        } catch (e) {}
+    }
+
+    var msg = "OK: unnested " + placed + " clip(s)";
+    if (skipped) msg += ", " + skipped + " outside the trim";
+    if (failed.length) msg += "  [failed: " + failed.join(", ") + "]";
+    return msg;
+};
+
 "host.jsx loaded";

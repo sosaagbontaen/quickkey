@@ -1,12 +1,12 @@
-/* Brand: deep navy #00005A and periwinkle #7F7FE3 from the QuickKey mark.
-   Navy is too dark to read as an accent on a dark panel, so periwinkle carries
-   the accent and the neutrals are biased toward navy to tie the two together. */
+/* Premiere-neutral greys with a gold accent: the panel should read as part of
+   Premiere, not as a guest with its own colour scheme. The QuickKey mark keeps
+   its navy and periwinkle — brand in the logo, host palette in the chrome. */
 :root{
-  --bg:#141520; --row:#1D1F2C; --row-hi:#262941; --line:#31344A; --line-soft:#262939;
-  --text:#E3E4F1; --dim:#8B8FA8; --faint:#5F6379;
+  --bg:#1b1d21; --row:#232629; --row-hi:#2b2f34; --line:#33373d; --line-soft:#2a2d32;
+  --text:#dfe2e7; --dim:#878f9c; --faint:#606874;
   --navy:#00005A;
-  --accent:#7F7FE3; --accent-hi:#9E9EEE;
-  --good:#7FC98A; --bad:#E07A6A;
+  --accent:#e0a04a; --accent-hi:#f0b96b;
+  --good:#7fc98a; --bad:#e07a6a;
 }
 *{box-sizing:border-box}
 body{
@@ -26,18 +26,18 @@ header{display:flex;justify-content:space-between;align-items:center}
 .modebar{display:flex;align-items:center;gap:7px;margin:11px 0 4px}
 .modebar label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 .modebar select{
-  flex:1;background:#0F1019;color:var(--text);border:1px solid var(--line);
+  flex:1;background:#15171a;color:var(--text);border:1px solid var(--line);
   border-radius:4px;padding:5px 7px;font:inherit;font-size:12px;
 }
 .modebar button{
-  width:24px;height:26px;background:#0F1019;color:var(--dim);border:1px solid var(--line);
+  width:24px;height:26px;background:#15171a;color:var(--dim);border:1px solid var(--line);
   border-radius:4px;font-size:14px;line-height:1;cursor:pointer;
 }
 .modebar button:hover{color:var(--accent);border-color:var(--accent)}
 .newmode{display:none;margin-bottom:6px}
 .newmode.show{display:block}
 .newmode input{
-  width:100%;background:#0F1019;color:var(--text);border:1px solid var(--accent);
+  width:100%;background:#15171a;color:var(--text);border:1px solid var(--accent);
   border-radius:4px;padding:6px 8px;font:inherit;font-size:12px;
 }
 
@@ -52,13 +52,13 @@ header{display:flex;justify-content:space-between;align-items:center}
   background:var(--row);border:1px solid transparent;border-radius:4px;margin-bottom:3px;
 }
 .cmd:hover{background:var(--row-hi)}
-.cmd.listening{border-color:var(--accent);background:#1F2140}
+.cmd.listening{border-color:var(--accent);background:#2e2820}
 .cmd.fired{border-color:var(--good)}
 .cmd.bad{border-color:var(--bad)}
 .chip{
   flex:0 0 auto;min-width:28px;height:23px;padding:0 6px;display:grid;place-items:center;
   font:600 11px/1 ui-monospace,Menlo,monospace;
-  background:#0F1019;border:1px solid var(--line);border-bottom-width:2px;
+  background:#15171a;border:1px solid var(--line);border-bottom-width:2px;
   border-radius:4px;color:var(--text);cursor:pointer;
 }
 .chip.empty{color:#4d535b;border-style:dashed;border-bottom-width:1px}
@@ -76,11 +76,11 @@ header{display:flex;justify-content:space-between;align-items:center}
 .body .sub.unset{color:var(--faint);font-style:italic}
 .cap{
   flex:0 0 auto;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
-  color:#A8ADC6;background:var(--row-hi);border:1px solid var(--line);
+  color:#9aa1ad;background:var(--row-hi);border:1px solid var(--line);
   border-radius:4px;padding:4px 8px;cursor:pointer;white-space:nowrap;
 }
 .cap:hover{color:var(--accent);border-color:var(--accent);background:var(--bg)}
-.cap.test{color:#B6BBD4}
+.cap.test{color:#a8afbb}
 .cmd.active{border-color:var(--accent)}
 .dotmark{flex:0 0 6px;height:6px;border-radius:50%;background:var(--accent)}
 
@@ -89,7 +89,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 .activity-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
 #log{
   font:11px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;
-  background:#0E0F17;border:1px solid var(--line);border-radius:4px;
+  background:#141619;border:1px solid var(--line);border-radius:4px;
   padding:7px 9px;height:82px;overflow:auto;color:var(--dim);
   -webkit-user-select:text;user-select:text;cursor:text;
 }
@@ -110,7 +110,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 }
 #pickerClose:hover{border-color:var(--accent);color:var(--accent)}
 #pickerSearch{
-  background:#0F1019;color:var(--text);border:1px solid var(--line);border-radius:4px;
+  background:#15171a;color:var(--text);border:1px solid var(--line);border-radius:4px;
   padding:6px 8px;font:inherit;font-size:12px;margin-bottom:7px;
 }
 #pickerList{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
@@ -122,11 +122,11 @@ header{display:flex;justify-content:space-between;align-items:center}
 .confirmbar{display:none}
 .confirmbar.show{
   display:flex;align-items:center;gap:8px;margin:8px 0 2px;padding:8px 10px;
-  background:#2A1D24;border:1px solid var(--bad);border-radius:4px;font-size:12px;
+  background:#2e2320;border:1px solid var(--bad);border-radius:4px;font-size:12px;
 }
 .confirmbar span{flex:1}
 .confirmbar button{
-  background:#0F1019;color:var(--dim);border:1px solid var(--line);border-radius:3px;
+  background:#15171a;color:var(--dim);border:1px solid var(--line);border-radius:3px;
   font:inherit;font-size:11px;padding:3px 9px;cursor:pointer;
 }
 .confirmbar button:hover{color:var(--text)}
@@ -138,7 +138,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 .settings:hover{color:var(--text)}
 .settings.none{color:var(--faint);cursor:default}
 .details{
-  background:#0F1019;border:1px solid var(--line);border-radius:4px;
+  background:#15171a;border:1px solid var(--line);border-radius:4px;
   margin:-1px 0 4px;padding:7px 9px;
   max-height:150px;overflow:auto;-webkit-user-select:text;user-select:text;
 }
@@ -169,7 +169,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 }
 .prange:hover::-webkit-slider-thumb{background:var(--accent-hi)}
 .pnum{
-  flex:0 0 auto;background:#0C0D14;color:var(--accent);border:1px solid var(--line);
+  flex:0 0 auto;background:#0f1113;color:var(--accent);border:1px solid var(--line);
   border-radius:3px;padding:2px 5px;text-align:right;
   font:600 11px/1.4 ui-monospace,Menlo,monospace;
 }
@@ -179,7 +179,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 .pnum::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
 .pbool{accent-color:var(--accent);margin-left:auto;cursor:pointer}
 .penum{
-  flex:1;min-width:0;margin-left:8px;background:#0C0D14;color:var(--accent);
+  flex:1;min-width:0;margin-left:8px;background:#0f1113;color:var(--accent);
   border:1px solid var(--line);border-radius:3px;padding:2px 4px;
   font:600 11px/1.4 -apple-system,"Helvetica Neue",sans-serif;cursor:pointer;
 }
@@ -189,7 +189,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 #slotAddWrap.show{display:flex}
 #slotAddWrap input{flex:1}
 #slotAddWrap select{
-  background:#0F1019;color:var(--text);border:1px solid var(--line);
+  background:#15171a;color:var(--text);border:1px solid var(--line);
   border-radius:4px;padding:5px 6px;font:inherit;font-size:11px;
 }
 .addslot{cursor:pointer;color:var(--accent)}
@@ -239,7 +239,7 @@ header{display:flex;justify-content:space-between;align-items:center}
   font-size:11px;font-weight:600;color:var(--accent);
   background:var(--row-hi);border:1px solid var(--accent);border-radius:4px;
 }
-.capturebtn:hover{background:var(--accent);color:#12131c}
+.capturebtn:hover{background:var(--accent);color:#1b1d21}
 .capturesteps{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
 .capturesteps li{font-size:11px;line-height:1.45;color:var(--dim)}
 .captureoutcome{margin-top:8px;font-size:11px;line-height:1.45;color:var(--accent)}
@@ -266,7 +266,7 @@ header{display:flex;justify-content:space-between;align-items:center}
   background:var(--row-hi);border:1px solid var(--accent);color:var(--accent);
   font:600 10.5px/1.4 -apple-system,sans-serif;letter-spacing:.03em;
 }
-#helpBtn:hover{background:var(--accent);color:#12131c}
+#helpBtn:hover{background:var(--accent);color:#1b1d21}
 .help{display:none}
 .help.open{
   display:block;margin:10px 0 2px;padding:11px 12px;
@@ -286,7 +286,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 .helpclose{
   margin-top:9px;margin-left:auto;width:max-content;padding:5px 14px;cursor:pointer;
   border-radius:4px;font-size:11px;font-weight:600;
-  background:var(--accent);color:#12131c;border:1px solid var(--accent);
+  background:var(--accent);color:#1b1d21;border:1px solid var(--accent);
 }
 .helpclose:hover{background:var(--accent-hi)}
 
@@ -303,7 +303,7 @@ header{display:flex;justify-content:space-between;align-items:center}
 }
 .setbtn{
   font:600 10px/1 -apple-system,sans-serif;padding:4px 9px;border-radius:4px;cursor:pointer;
-  background:var(--accent);color:#12131c;border:1px solid var(--accent);
+  background:var(--accent);color:#1b1d21;border:1px solid var(--accent);
 }
 .setbtn:hover{background:var(--accent-hi)}
 
