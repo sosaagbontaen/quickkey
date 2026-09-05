@@ -130,6 +130,8 @@ footer{padding-top:28px;font-family:var(--f-mono);font-size:10.5px;letter-spacin
   <div class="bar"><i id="bar"></i></div>
 </div>
 
+<script id="state" type="application/json">{"done": {"windows-decide": {"at": "5 Sep 2026", "note": "Decided: ship both Mac and Windows"}}}</script>
+
 <main id="gates"></main>
 
 <footer>
@@ -252,8 +254,13 @@ const GATES = [
 ];
 
 const ALL = GATES.reduce((n, g) => n + g.items.length, 0);
-let state = {};              // id -> { at }
-let db = null;
+// The page IS the record: state is baked into the document and a tick
+// republishes it. That keeps the checklist shareable, which a separate data
+// store would not be.
+let state = {};
+try { state = (JSON.parse(document.getElementById("state").textContent) || {}).done || {}; }
+catch (e) { state = {}; }
+let artifact = null, canWrite = true, publishTimer = null;
 
 const CHECK = '<svg viewBox="0 0 12 12"><path d="M2 6.2 4.6 8.8 10 3.4"/></svg>';
 
@@ -364,35 +371,52 @@ function today() {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
-async function setItem(id, on) {
+function setSync(t) { document.getElementById("sync").textContent = t; }
+
+// Rebuild the source rather than serializing the live DOM: everything the page
+// mutates at runtime is reset first, so what gets published is the original
+// document carrying new state.
+function currentSource() {
+  const clone = document.documentElement.cloneNode(true);
+  clone.querySelector("#gates").innerHTML = "";
+  clone.querySelector("#doneCount").textContent = "0";
+  clone.querySelector("#totalCount").textContent = "0";
+  clone.querySelector("#bar").removeAttribute("style");
+  clone.querySelector("#sync").textContent = "loading\u2026";
+  clone.querySelector("#state").textContent = JSON.stringify({ done: state });
+  return "<!doctype html>\n<html>" + clone.innerHTML + "</html>";
+}
+
+async function publishNow() {
+  if (!artifact || !canWrite) return;
+  try {
+    await artifact.publish(currentSource());
+    setSync("saved");
+  } catch (e) {
+    const code = e && e.code;
+    if (code === "conflict") { setSync("someone else saved first \u2014 reloading"); return; }
+    if (code === "not_granted" || code === "not_writer") { canWrite = false; setSync("view only"); return; }
+    setSync("not saved \u2014 " + (code || "error"));
+  }
+}
+
+function setItem(id, on) {
   if (on) state[id] = { at: today() }; else delete state[id];
   paint();
-  if (!db) return;
-  try {
-    await db.doc("launch/checklist").set({ done: state, updatedAt: Date.now() });
-  } catch (e) {
-    document.getElementById("sync").textContent = "not saved — " + (e && e.code ? e.code : "error");
-  }
+  if (!artifact) { setSync("this device only"); return; }
+  if (!canWrite) { setSync("view only \u2014 not saved"); return; }
+  // Batch rapid ticks into one publish; every view reloads on each one.
+  setSync("saving\u2026");
+  clearTimeout(publishTimer);
+  publishTimer = setTimeout(publishNow, 800);
 }
 
 build();
 paint();
 
 (async () => {
-  db = await claude.use("db");
-  const sync = document.getElementById("sync");
-  if (!db) {
-    // Design for absence: the list still works, it just does not travel.
-    sync.textContent = "this device only";
-    return;
-  }
-  sync.textContent = "synced";
-  db.doc("launch/checklist").onSnapshot(
-    snap => {
-      state = (snap.exists && snap.data && snap.data.done) ? snap.data.done : {};
-      paint();
-    },
-    err => { sync.textContent = "sync error — " + (err && err.code ? err.code : "unknown"); }
-  );
+  artifact = await claude.use("artifact");
+  if (!artifact) { setSync("this device only"); return; }
+  setSync("shared");
 })();
 </script>
