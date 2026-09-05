@@ -123,6 +123,18 @@ ul li::before{content:"";position:absolute;left:2px;top:.62em;width:6px;height:6
 .verify b{font-family:var(--f-display);font-size:15px}
 .verify span{font-size:15px;color:var(--muted)}
 
+.flag{background:var(--warn-wash);border:1px solid var(--warn-edge);border-left-width:3px;
+      padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.flag b{font-family:var(--f-display);font-size:16px;color:var(--warn)}
+.flag p{font-size:15px;line-height:1.55}
+.todo{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.todo > div{background:var(--surface);padding:14px 16px;display:flex;gap:13px;align-items:baseline}
+.todo .box{flex:0 0 13px;height:13px;border:1.5px solid var(--accent);border-radius:3px;align-self:center}
+.todo .what{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.todo .what b{font-family:var(--f-display);font-size:15px;font-weight:700}
+.todo .what span{font-size:14.5px;line-height:1.5;color:var(--muted)}
+.todo .tag{font-family:var(--f-mono);font-size:9.5px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--faint);white-space:nowrap;flex:0 0 auto;align-self:center}
 footer{padding-top:30px;font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;
        color:var(--faint);text-transform:uppercase}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
@@ -140,7 +152,7 @@ footer{padding-top:30px;font-family:var(--f-mono);font-size:11px;letter-spacing:
   <div class="meta">
     <span>Status: working prototype</span>
     <span>Not yet installable by a stranger</span>
-    <span>29 Aug 2026</span>
+    <span>Updated 5 Sep 2026</span>
   </div>
 </header>
 
@@ -162,10 +174,35 @@ footer{padding-top:30px;font-family:var(--f-mono);font-size:11px;letter-spacing:
       <div>
         <h3>Notarise the daemon with Apple</h3>
         <p>An Apple Developer account lets us sign and notarise the hotkey app, so macOS stops describing it as possible malware on first launch.</p>
-        <div class="cost">~$99/year &middot; ~1 day</div>
+        <div class="cost">Apple Developer Program &middot; ~$99/year &middot; ~1 day</div>
       </div>
     </div>
     <p>Call it two days and about a hundred dollars. Until it&rsquo;s done, everything below is theoretical.</p>
+    <div class="todo">
+      <div><span class="box"></span><span class="what"><b>Enrol in the Apple Developer Program</b>
+        <span>Enrolment is not instant &mdash; identity verification can take days. Start it before it is on the critical path.</span></span><span class="tag">Do now</span></div>
+      <div><span class="box"></span><span class="what"><b>Obtain a code-signing certificate for the ZXP</b>
+        <span>A self-signed certificate may be sufficient for normal installation. If so, this costs nothing.</span></span><span class="tag">Verify</span></div>
+      <div><span class="box"></span><span class="what"><b>Check whether the signed ZXP removes the debug-mode switch</b>
+        <span>If it does, the ugliest part of installation disappears entirely.</span></span><span class="tag">Verify</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="label">Getting Testers</div>
+  <div class="col">
+    <h2>There is no TestFlight for Adobe plugins</h2>
+    <p>Nothing equivalent exists. No staged rollout, no beta channel, no review queue standing between us and a tester. That sounds like a gap and is mostly a relief: <strong>a signed ZXP is just a file we send people.</strong> Email it, link it, hand it over. They install it and it works.</p>
+    <p>Which means the beta programme is not a piece of infrastructure to build. It is a list of names, a download link and a way to hear back.</p>
+
+    <h3 style="margin-top:6px">On the permissions problem</h3>
+    <p>This is the same blocker as above, and it resolves in two halves:</p>
+    <ul>
+      <li><strong>The Premiere half</strong> disappears with a signed ZXP. No <code>PlayerDebugMode</code>, no security setting to switch on, no instructions that read like a jailbreak.</li>
+      <li><strong>The macOS half</strong> disappears with Apple notarisation. The hotkey helper stops being described as unverified software.</li>
+    </ul>
+    <p>What Dom and I had to do &mdash; click past warnings, flip a hidden preference &mdash; is not a smaller version of what a customer will do. It is a different thing entirely, and no customer will do it. Fix both halves and installation becomes double-click, done.</p>
   </div>
 </section>
 
@@ -205,6 +242,17 @@ footer{padding-top:30px;font-family:var(--f-mono);font-size:11px;letter-spacing:
 </section>
 
 <section>
+  <div class="label">Feedback Loop</div>
+  <div class="col">
+    <h2>Trading trial credit for a conversation</h2>
+    <p>The FastLane tactic &mdash; a prominent button offering extended trial in exchange for booking a call &mdash; is a good one, and worth building. Two honest qualifications about <em>when</em>.</p>
+    <p><strong>It presupposes a trial system we have not built.</strong> Time limits, licence keys, a way to grant an extension: none of that exists yet, and it is real engineering. Worth scoping before it is assumed.</p>
+    <p><strong>At ten users the button is the slow path.</strong> Its value is converting strangers at volume. Right now we can simply message editors directly and ask &mdash; faster, warmer, and it produces better answers than an incentivised form. Build the button when the traffic exists to justify it.</p>
+    <p>One thing to watch when it does ship: <strong>people rewarded for feedback give generous feedback.</strong> Ask what they tried and abandoned, not whether they liked it. The most useful sentence a tester can produce is &ldquo;I stopped using it when&hellip;&rdquo;</p>
+  </div>
+</section>
+
+<section>
   <div class="label">Our Advantage</div>
   <div class="col">
     <h2>We can make the demo. Most plugin developers cannot.</h2>
@@ -215,33 +263,98 @@ footer{padding-top:30px;font-family:var(--f-mono);font-size:11px;letter-spacing:
 </section>
 
 <section>
+  <div class="label">Company</div>
+  <div class="col">
+    <h2>What we need before money changes hands</h2>
+    <p><em>General orientation, not legal advice. The documents themselves are worth an hour of a real lawyer&rsquo;s time &mdash; the cost is small next to what an unwritten assumption costs later.</em></p>
+
+    <h3 style="margin-top:6px">Do we need an entity?</h3>
+    <p>Strictly, no. Software can be sold by individuals. But there is a specific reason to consider one here: <strong>two people sharing profits can constitute a general partnership by default</strong>, without anyone signing anything &mdash; and in that arrangement each partner can be personally liable for obligations the other creates. An LLC separates the business from our personal finances.</p>
+    <p>It also makes &ldquo;reinvest the profits&rdquo; mean something. Without an entity, revenue is personal income to each of us that we then choose to spend on the product. With one, money can simply stay in the business. Worth asking an accountant how retained profits are taxed in our situation before assuming reinvestment is tax-free.</p>
+    <p>Selling through aescripts also lightens this considerably: the marketplace handles payment processing and much of the tax collection, which is a genuine argument for starting there rather than selling direct.</p>
+
+    <h3 style="margin-top:6px">The founder agreement matters more than the entity</h3>
+    <p>You are right that we need this now, while we agree about everything. The terms that cause the damage when missing:</p>
+    <div class="todo">
+      <div><span class="box"></span><span class="what"><b>IP assignment</b>
+        <span>That the code belongs to the venture, not to whoever typed it. This is the most commonly skipped clause and the most destructive one to be missing.</span></span><span class="tag">Critical</span></div>
+      <div><span class="box"></span><span class="what"><b>Split, and what it is a split of</b>
+        <span>Profit share is not the same as ownership. Say which we mean, and how expenses come out first.</span></span></div>
+      <div><span class="box"></span><span class="what"><b>What happens if one of us stops</b>
+        <span>The uncomfortable one, and the reason to write it while nobody is leaving. Vesting exists for exactly this.</span></span><span class="tag">Do early</span></div>
+      <div><span class="box"></span><span class="what"><b>Who decides what</b>
+        <span>Fine to be informal, but write down what needs both of us &mdash; pricing, selling, taking money in.</span></span></div>
+      <div><span class="box"></span><span class="what"><b>Expenses</b>
+        <span>The developer account, certificates, a Windows machine. Who pays, and how it is recovered.</span></span></div>
+    </div>
+
+    <h3 style="margin-top:6px">Liability, and why it is not zero</h3>
+    <p>QuickKey edits people&rsquo;s project files. The realistic bad day is not a lawsuit, it is a bug that damages an edit before a deadline. Two things follow.</p>
+    <p><strong>We need an end-user licence with a warranty disclaimer and a liability cap.</strong> Standard, boilerplate, and it is what stands between a bad bug and a claim for someone&rsquo;s lost billable work. Marketplaces supply usable terms, which is one more reason to launch through one.</p>
+    <p><strong>And it raises the bar on testing.</strong> Every command should be undoable in Premiere&rsquo;s own history &mdash; something we have already verified &mdash; and that property is worth protecting deliberately as features are added.</p>
+  </div>
+</section>
+
+<section>
+  <div class="label">Biggest Gap</div>
+  <div class="col">
+    <h2>We have not decided about Windows</h2>
+    <div class="flag">
+      <b>QuickKey is Mac-only, and a large share of Premiere editors are on Windows.</b>
+      <p>This is the most consequential thing neither of us has raised. Everything above &mdash; aescripts, reviewers, pricing &mdash; is being planned for a product that currently serves a fraction of its market.</p>
+    </div>
+    <p><strong>The good news is that most of the work already ports.</strong> The panel is HTML and JavaScript and the Premiere-side code is ExtendScript; both run identically on Windows. Only the hotkey daemon is Mac-specific, because it uses macOS&rsquo;s Carbon hotkey API.</p>
+    <p>A Windows version means rewriting that one component against Win32, plus a different installer and a Windows machine to test on. Call it a solid session of work and a device we do not own &mdash; not a rebuild.</p>
+    <p>Three ways to play it, and we should pick deliberately rather than by default:</p>
+    <ul>
+      <li><strong>Mac first, Windows after validation.</strong> Ship narrow, learn, port once we know people pay. Costs us reach and some reviewer interest.</li>
+      <li><strong>Both at launch.</strong> Full market from day one, but delays everything by the port plus the testing we cannot do on our own machines.</li>
+      <li><strong>Mac-only, permanently.</strong> Defensible for a niche premium tool, but it should be a decision we made, not one we drifted into.</li>
+    </ul>
+    <p>Worth asking Dom what the split looks like among editors he actually knows. That answer is better evidence than any market figure we could look up.</p>
+  </div>
+</section>
+
+<section>
   <div class="label">Sequence</div>
   <div class="col">
     <h2>In this order, and not another</h2>
     <p>A waitlist collects demand that already exists. Built now, it would carefully capture no traffic. It earns its place at step 4, once the video gives it something to catch.</p>
     <ol class="steps">
       <li>
-        <h3>Get it onto 5&ndash;10 working editors&rsquo; machines</h3>
-        <p>We have one enthusiastic editor and he is a co-founder. That is a real signal, not a market. Give it away, watch what breaks on machines we have never seen. We already know the risk: QuickKey leans on an undocumented Premiere layer, and we have exactly two data points on how it behaves across versions.<span class="owner">Blocks everything</span></p>
+        <h3>Enrol in the Apple Developer Program</h3>
+        <p>Verification can take days and everything downstream waits on it. Nothing else needs to be decided first.<span class="owner">This week</span></p>
       </li>
       <li>
-        <h3>Fix signing and notarisation. Ship a ZXP.</h3>
-        <p>The gate above. Nothing reaches a stranger until this is done.</p>
+        <h3>Write the founder agreement</h3>
+        <p>Runs in parallel with everything. Cheapest while we still agree about everything.<span class="owner">Sam + Dom</span></p>
+      </li>
+      <li>
+        <h3>Get it onto 5&ndash;10 working editors&rsquo; machines</h3>
+        <p>We have one enthusiastic editor and he is a co-founder. That is a real signal, not a market. Hand-hold the install for now. We already know the risk: QuickKey leans on an undocumented Premiere layer, and we have two data points on how it behaves across versions.<span class="owner">Blocks the rest</span></p>
+      </li>
+      <li>
+        <h3>Decide about Windows</h3>
+        <p>Answer it before building a launch around a Mac-only product. Dom&rsquo;s sense of what editors he knows actually run is the evidence to use.</p>
+      </li>
+      <li>
+        <h3>Sign and notarise. Ship a ZXP.</h3>
+        <p>The gate. After this, installation is double-click and testers stop needing us on the phone.</p>
       </li>
       <li>
         <h3>Make the demo video</h3>
-        <p>Sixty seconds. Narration optional. The pain, then the keystroke, then the selection-following moment.<span class="owner">Dom + Sam</span></p>
+        <p>Sixty seconds. The pain, then the keystroke, then the selection-following moment.<span class="owner">Dom + Sam</span></p>
+      </li>
+      <li>
+        <h3>Licensing, trial, and the feedback button</h3>
+        <p>Keys and time limits first; the trade-a-call-for-credit button sits on top of that.</p>
       </li>
       <li>
         <h3>One-page site with an email capture</h3>
         <p>Now the waitlist works, because the video feeds it.</p>
       </li>
       <li>
-        <h3>List on aescripts</h3>
-        <p>Let the video do the selling.</p>
-      </li>
-      <li>
-        <h3>Approach reviewers</h3>
+        <h3>List on aescripts, then approach reviewers</h3>
         <p>With a finished product and a working demo &mdash; not a pitch.</p>
       </li>
     </ol>
@@ -274,8 +387,15 @@ footer{padding-top:30px;font-family:var(--f-mono);font-size:11px;letter-spacing:
     <div class="verify">
       <div><b>aescripts&rsquo; revenue split and submission terms</b><span>Believed to be around 30%, but marketplace terms shift. Confirm before building pricing around it.</span></div>
       <div><b>Adobe Exchange&rsquo;s current requirements</b><span>Review criteria and packaging rules change between Creative Cloud releases.</span></div>
-      <div><b>Whether a self-signed ZXP is enough</b><span>It may satisfy normal installation without a purchased certificate. This changes the cost of step 2 materially.</span></div>
+      <div><b>Whether a self-signed ZXP is enough</b><span>It may satisfy normal installation without a purchased certificate. If so, the signing step costs nothing.</span></div>
+      <div><b>How retained profits are taxed for us specifically</b><span>&ldquo;Reinvest it&rdquo; may still be taxable income depending on how we are set up. An accountant answers this in one conversation.</span></div>
+      <div><b>The Mac/Windows split among editors Dom knows</b><span>Better evidence for the Windows decision than any published market figure.</span></div>
     </div>
+    <h3 style="margin-top:10px">Two smaller things worth doing before the name is printed on anything</h3>
+    <ul>
+      <li><strong>Check that &ldquo;QuickKey&rdquo; is free to use</strong> &mdash; a trademark search and a domain check. Cheap now, expensive after a launch video.</li>
+      <li><strong>Read Adobe&rsquo;s branding rules</strong> for third-party plugins. There are constraints on implying endorsement and on how &ldquo;for Premiere Pro&rdquo; may be worded.</li>
+    </ul>
     <p>And the honest caution: none of this is the most valuable unknown right now. That is still whether QuickKey holds up on ten machines that are not ours.</p>
   </div>
 </section>
