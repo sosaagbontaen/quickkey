@@ -153,8 +153,10 @@ const GATES = [
         why: "A signed ZXP installs through normal tooling and should remove the PlayerDebugMode requirement entirely." },
       { id: "notarise", title: "Notarise the hotkey daemon with Apple",
         why: "Stops macOS describing our app as unverified software on first launch." },
+      { id: "win-sign", title: "Sign the Windows build",
+        why: "Unsigned Windows executables trigger a SmartScreen warning much like the macOS one. A code-signing certificate is a separate purchase from the Apple account — budget for it rather than discovering it late.", tags: [["verify","Cost unknown"]] },
       { id: "install-clean", title: "Install on a machine that has never seen QuickKey",
-        why: "No hand-holding, no terminal, no instructions from us. If that works, this gate is genuinely closed." }
+        why: "On both platforms. No hand-holding, no terminal, no instructions from us. If that works, this gate is genuinely closed." }
     ]
   },
   {
@@ -169,19 +171,23 @@ const GATES = [
       { id: "undo-audit", title: "Confirm every command is undoable in Premiere’s own history",
         why: "The realistic bad day is not a lawsuit, it is a bug that damages an edit before a deadline. Undo is the safety net and it should stay verified as features are added." },
       { id: "windows-decide", title: "Decide Mac-only, or Windows too",
-        why: "A large share of Premiere editors are on Windows. See the note under this gate.", tags: [["decide","Decide"]] },
-      { id: "windows-port", title: "Port the hotkey daemon to Windows",
-        why: "Only if the decision above says so. The panel and Premiere-side code already run on Windows unchanged." }
+        why: "Decided 5 Sep 2026: ship both. That makes the three items below real work rather than contingencies." },
+      { id: "windows-machine", title: "Get a Windows machine with Premiere on it",
+        why: "We cannot ship a Windows build neither of us has run. An Adobe subscription covers installs on two machines, so this is hardware, not another licence.", tags: [["now","Blocks the port"]] },
+      { id: "windows-port", title: "Rewrite the hotkey daemon for Windows",
+        why: "The one Mac-specific component — it uses macOS’s Carbon hotkey API. Windows needs the equivalent Win32 registration. The panel and the Premiere-side code already run unchanged." },
+      { id: "windows-parity", title: "Confirm the two builds behave the same",
+        why: "Same commands, same keys, same failures. Two platforms is two support surfaces, and the undocumented Premiere layer we depend on is exactly the sort of thing that differs." }
     ],
     note: {
-      title: "The Windows decision, in short",
-      body: "Only the hotkey daemon is Mac-specific — it uses macOS’s Carbon API. The panel is HTML and JavaScript and the Premiere-side code is ExtendScript; both run identically on Windows. So this is a port of one component plus a machine to test on, not a rebuild.",
+      title: "Decided: both platforms",
+      body: "Only the hotkey daemon is Mac-specific — it uses macOS’s Carbon API. The panel is HTML and JavaScript and the Premiere-side code is ExtendScript; both run identically on Windows, and a signed ZXP is one cross-platform package that installs on either. So this is a port of one component, not a rebuild.",
       list: [
-        "<b>Mac first, port after validation.</b> Ship narrow, learn, then widen. Costs reach and some reviewer interest.",
-        "<b>Both at launch.</b> Full market immediately, but delays everything by the port and the testing we cannot do ourselves.",
-        "<b>Mac-only permanently.</b> Defensible for a niche premium tool — but it should be chosen, not drifted into."
+        "<b>What it costs.</b> A Win32 rewrite of the daemon, a Windows machine to test on, and a second code-signing certificate.",
+        "<b>What it buys.</b> The whole Premiere market rather than a fraction of it, and reviewers who will not have to caveat the recommendation.",
+        "<b>What to watch.</b> Two platforms means every bug can be platform-specific — and the undocumented layer we lean on is precisely where that will bite."
       ],
-      tail: "Ask Dom what the split looks like among editors he actually knows. Better evidence than any published figure."
+      tail: "The panel work already done carries over untouched. What does not carry over is our confidence: nothing here has ever run on Windows."
     }
   },
   {
