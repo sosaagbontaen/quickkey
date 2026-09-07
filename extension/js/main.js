@@ -1196,7 +1196,8 @@
   evalHost("$.evalFile(File(" + JSON.stringify(HOSTJSX) + ")); app.setExtensionPersistent('com.quickkey.dev.panel',1); 'ready ' + app.version",
     function (v) {
       document.getElementById("dot").className = "on";
-      document.getElementById("statusText").textContent = "Premiere " + String(v).replace("ready ","");
+      document.getElementById("statusText").textContent =
+        "v" + QK_VERSION + " \u00b7 Premiere " + String(v).replace("ready ","");
       log(String(v), "ok");
     });
 })();
