@@ -1,3 +1,5 @@
+var QK_VERSION = "0.3.0";
+
 // QuickKey catalogue.
 //
 // Two kinds of command:

@@ -3,6 +3,7 @@
 set -e
 cd "$(dirname "$0")"
 EXT=extension
+QK_VER=$(sed -n 's/^var QK_VERSION = "\(.*\)";/\1/p' extension/js/commands.js)
 OUT=dist/QuickKey
 rm -rf dist && mkdir -p "$OUT"
 
@@ -41,12 +42,13 @@ cat > "$INST/Contents/Info.plist" << 'PLIST'
   <key>CFBundleIdentifier</key><string>com.quickkey.installer</string>
   <key>CFBundleExecutable</key><string>installer</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>CFBundleShortVersionString</key><string>VERSION_PLACEHOLDER</string>
   <key>CFBundleIconFile</key><string>QuickKey</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
 </dict>
 </plist>
 PLIST
+sed -i "" "s/VERSION_PLACEHOLDER/$QK_VER/" "$INST/Contents/Info.plist"
 
 cat > "$INST/Contents/MacOS/installer" << 'INNER'
 #!/bin/bash
@@ -170,7 +172,7 @@ TURNING IT OFF
   It does not start by itself when you reboot — open it again when you want it.
 INNER
 
-cd dist && zip -qr QuickKey-mac.zip QuickKey && cd ..
+cd dist && zip -qr "QuickKey-mac-v$QK_VER.zip" QuickKey && cd ..
 echo
-echo "built: dist/QuickKey-mac.zip  ($(du -h dist/QuickKey-mac.zip | cut -f1))"
+echo "built: dist/QuickKey-mac-v$QK_VER.zip  ($(du -h "dist/QuickKey-mac-v$QK_VER.zip" | cut -f1))"
 lipo -archs "$INST/Contents/Resources/QuickKeyDaemon.app/Contents/MacOS/QuickKeyDaemon" | sed 's/^/  daemon architectures: /'
