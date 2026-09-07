@@ -51,6 +51,22 @@
   function readFile(p){ try{ return window.cep.fs.readFile(p); }catch(e){ return {err:-1}; } }
   function writeFile(p,s){ try{ return window.cep.fs.writeFile(p,s); }catch(e){ return {err:-1}; } }
 
+  // Premiere holds keyboard focus, and a single .focus() call frequently does
+  // not take. Retry across a few frames and stop as soon as it lands — this is
+  // what made the search box and the name fields feel intermittently broken.
+  function focusSoon(node, tries) {
+    if (!node) return;
+    var attempts = tries || [0, 40, 120, 300, 600];
+    for (var i = 0; i < attempts.length; i++) {
+      (function (ms) {
+        setTimeout(function () {
+          if (document.activeElement === node) return;
+          try { window.focus(); node.focus(); } catch (e) {}
+        }, ms);
+      })(attempts[i]);
+    }
+  }
+
   function evalHost(code, cb) {
     var wrapped = "(function(){try{return String(eval(" + JSON.stringify(code) +
                   "))}catch(e){return 'QK_ERR: '+e.toString()}})()";
@@ -938,24 +954,57 @@
     var box = document.getElementById("pickerSearch"); box.value = "";
     focusSoon(box);
 
-    if (effectCache[type]) return drawPicker("", current);
-    document.getElementById("pickerList").innerHTML = "<div class='fx'>loading…</div>";
+    // An empty array is truthy: caching one failed load left the picker showing
+    // "no match" forever, with no way to recover short of reopening the panel.
+    if (effectCache[type] && effectCache[type].length) return drawPicker("", current);
+
+    document.getElementById("pickerList").innerHTML = "<div class='fx'>loading\u2026</div>";
     var cmd = type === "audio" ? "qkListAudioEffects()"
             : type === "transition" ? "qkListTransitions()" : "qkListEffects()";
-    evalHost(cmd, function (r) {
-      // Premiere lists some effects twice under one name (Transform, Noise
-      // (Legacy)). We resolve effects by name, so both rows would apply the
-      // identical effect — showing two is confusion with no upside.
-      var seen = {};
-      effectCache[type] = String(r).split("|").filter(function (x) {
-        if (!x || x.indexOf("QK_ERR") === 0 || seen[x]) return false;
-        seen[x] = 1; return true;
+
+    // The panel can reopen faster than Premiere re-evaluates host.jsx, and
+    // asking for the list before then quietly returned nothing.
+    ensureHost(function (ready) {
+      if (!ready) return pickerError("Premiere has not answered yet.", slotId, current);
+      evalHost(cmd, function (r) {
+        // Premiere lists some effects twice under one name (Transform, Noise
+        // (Legacy)). We resolve effects by name, so both rows would apply the
+        // identical effect — showing two is confusion with no upside.
+        var seen = {};
+        var list = String(r).split("|").filter(function (x) {
+          if (!x || x.indexOf("QK_ERR") === 0 || seen[x]) return false;
+          seen[x] = 1; return true;
+        });
+        if (!list.length) return pickerError("Could not read the effect list.", slotId, current);
+        effectCache[type] = list;
+        box.placeholder = "Search\u2026";
+        drawPicker("", current);
       });
-      box.placeholder = "Search " + effectCache[type].length + " " +
-        (type === "transition" ? "transitions" : type === "audio" ? "audio effects" : "effects") + "…";
-      drawPicker("", current);
     });
   }
+
+  // Never show "no match" when the truth is "nothing loaded" — that sent Dom
+  // looking for a search bug that was really a loading failure.
+  function pickerError(msg, slotId, current) {
+    var list = document.getElementById("pickerList");
+    list.innerHTML = "";
+    var e = document.createElement("div");
+    e.className = "fx";
+    e.textContent = msg + "  Tap to try again.";
+    e.onclick = function () { openPicker(slotId, current); };
+    list.appendChild(e);
+    log(msg, "bad");
+  }
+
+  // Confirms the host functions exist, reloading them if Premiere has forgotten.
+  function ensureHost(cb) {
+    evalHost("typeof qkListEffects", function (t) {
+      if (String(t) === "function") return cb(true);
+      evalHost("$.evalFile(File(" + JSON.stringify(HOSTJSX) + ")); typeof qkListEffects",
+        function (t2) { cb(String(t2) === "function"); });
+    });
+  }
+
 
   function drawPicker(q, current) {
     var list = document.getElementById("pickerList");
