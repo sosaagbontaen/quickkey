@@ -456,7 +456,7 @@
     listening = id; armError = null; armReady = false; render();
     // Give the view something focusable, or real keystrokes never arrive.
     var el = document.getElementById("cmd-" + id);
-    if (el) { el.tabIndex = -1; el.focus(); }
+    if (el) { el.tabIndex = -1; focusSoon(el); }
     writeFile(BRIDGE + "/suspend.json", JSON.stringify({ on: true, t: Date.now() }));
 
     var tries = 0;
@@ -504,7 +504,7 @@
     if (note) { var b = document.createElement("em"); b.textContent = note; g.appendChild(b); }
     if (addable) {
       var plus = document.createElement("em");
-      plus.className = "addslot"; plus.textContent = "+ add default";
+      plus.className = "addslot"; plus.textContent = "+ add QuickKey";
       plus.onclick = openSlotAdd;
       g.appendChild(plus);
     }
@@ -597,7 +597,7 @@
       // point. Removal is scoped to this mode; other modes keep theirs.
       var rm = document.createElement("div");
       rm.className = "rmslot"; rm.textContent = "\u00d7";
-      rm.title = "Remove this default from " + (m ? m.name : "this mode");
+      rm.title = "Remove this QuickKey from " + (m ? m.name : "this mode");
       rm.onclick = function (e) {
         e.stopPropagation();
         confirmThen("Remove \u201c" + s.label + "\u201d from \u201c" + (m ? m.name : "") + "\u201d?", "Remove", function () {
@@ -867,7 +867,7 @@
   document.getElementById("modeAdd").onclick = function () {
     var w = document.getElementById("modeNameWrap");
     w.className = "newmode show";
-    var i = document.getElementById("modeName"); i.value = ""; i.focus();
+    var i = document.getElementById("modeName"); i.value = ""; focusSoon(i);
   };
   document.getElementById("modeName").onkeydown = function (e) {
     e.stopPropagation();
@@ -904,7 +904,7 @@
       });
     }
     w.className = "newmode show";
-    var i = document.getElementById("slotName"); i.value = ""; i.focus();
+    var i = document.getElementById("slotName"); i.value = ""; focusSoon(i);
   }
 
   document.getElementById("slotName").onkeydown = function (e) {
@@ -914,14 +914,14 @@
     var name = this.value.trim(); if (!name) return;
     var type = document.getElementById("slotType").value;
 
-    mark("add default \u201c" + name + "\u201d");
+    mark("add \u201c" + name + "\u201d");
     var slot = { id: "s" + Date.now().toString(36), label: name, type: type,
                  icon: type === "audio" ? "audio" : (type === "transition" ? "trans" : "wand"),
                  effect: "", params: "" };
     mode().slots.push(slot);
     document.getElementById("slotAddWrap").className = "newmode";
     save(); render();
-    log("added default \u201c" + name + "\u201d — pick its effect, then give it a key", "ok");
+    log("added \u201c" + name + "\u201d — pick its effect, then give it a key", "ok");
   };
 
   // ---------- effect picker ----------
@@ -932,10 +932,11 @@
     document.getElementById("pickerTitle").textContent = "Effect for " + (slot ? slot.label : slotId);
     var pk = document.getElementById("picker");
     pk.className = "picker show";
-    pk.tabIndex = -1; pk.focus();
-    // Deliberately not focused: with the caret in the search box, Backspace
-    // would edit text instead of going back.
-    var box = document.getElementById("pickerSearch"); box.value = ""; box.blur();
+    pk.tabIndex = -1; focusSoon(pk, [0, 40, 120]);
+    // Focused so typing works immediately. Backspace on an empty box still goes
+    // back, so the two behaviours no longer conflict.
+    var box = document.getElementById("pickerSearch"); box.value = "";
+    focusSoon(box);
 
     if (effectCache[type]) return drawPicker("", current);
     document.getElementById("pickerList").innerHTML = "<div class='fx'>loading…</div>";

@@ -5,7 +5,8 @@ set -e
 cd "$(dirname "$0")"
 DEST="$HOME/Library/Application Support/Adobe/CEP/extensions/com.quickkey.dev"
 mkdir -p "$DEST"
-rsync -a --delete --exclude '.debug' extension/ "$DEST/"
+# .debug enables the devtools port for development; package strips it
+rsync -a --delete extension/ "$DEST/"
 echo "  panel  -> $DEST"
 
 APP=daemon/QuickKeyDaemon.app
