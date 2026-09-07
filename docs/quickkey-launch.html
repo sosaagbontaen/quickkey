@@ -130,7 +130,7 @@ footer{padding-top:28px;font-family:var(--f-mono);font-size:10.5px;letter-spacin
   <div class="bar"><i id="bar"></i></div>
 </div>
 
-<script id="state" type="application/json">{"done":{"windows-decide":{"at":"Sep 5, 2026"}}}</script>
+<script id="state" type="application/json">{"done": {"windows-decide": {"at": "Sep 5, 2026"}, "sub-channel": {"at": "Sep 7, 2026"}}}</script>
 
 <main id="gates"></main>
 
@@ -221,13 +221,13 @@ const GATES = [
       { id: "free-line", title: "Decide what the free tier actually includes",
         why: "Gating custom QuickKeys while giving the built-in ones free is a well-chosen line — the free tier is genuinely useful and the paid one is the reason people came. Too generous and nobody upgrades; too thin and nobody adopts.", tags: [["decide","Decide"]] },
       { id: "sub-channel", title: "Check our channels can actually sell a subscription",
-        why: "Marketplaces in this category are largely built around one-time purchases. If aescripts cannot handle recurring billing, the pricing model and the distribution plan are in conflict — and we would need our own billing, which is real work.", tags: [["verify","Verify first"]] },
+        why: "Answered 7 Sep 2026: aescripts supports subscriptions directly — recurring billing, auto-renew, and subscription licenses that re-check every 7 days. Flat 30% commission with no other fees, and they handle sales tax, VAT, chargebacks and compliance. The pricing model and the distribution plan are not in conflict." },
       { id: "compat-promise", title: "Decide what we promise if Adobe breaks the layer we depend on",
         why: "A point release could remove it. Charging monthly raises the stakes: a subscriber whose plugin broke last week is owed something a one-time buyer is not. Decide the refund and pause policy before the first payment, not after the first outage.", tags: [["decide","Decide"]] },
       { id: "licensing", title: "Build license keys and a trial",
         why: "Does not exist yet, and the feedback button below depends on it." },
       { id: "aescripts", title: "Apply to list on aescripts + aeplugins",
-        why: "The trusted marketplace for After Effects and Premiere tools, and where working editors go looking. Being listed is itself the credibility.", tags: [["verify","Confirm terms"]] }
+        why: "The trusted marketplace for After Effects and Premiere tools, running since 2008, and where working editors go looking. Flat 30% commission, they handle tax and compliance, and they support subscriptions. Submission is by proposal and reviewed before you become an author — so it is an application, not a signup." }
     ]
   },
   {
