@@ -1,5 +1,5 @@
 #!/bin/bash
-# qk — send ExtendScript to the running Premiere via the QuickKey dev bridge.
+# qk -- send ExtendScript to the running Premiere via the QuickKey dev bridge.
 # usage:  ./qk 'app.version'        |  ./qk -f script.jsx
 B="$HOME/Library/Application Support/QuickKey/bridge"
 if [ "$1" = "-f" ]; then CODE=$(cat "$2"); else CODE="$1"; fi

@@ -1,5 +1,5 @@
 #!/bin/bash
-# package — build a shareable QuickKey installer for macOS.
+# package -- build a shareable QuickKey installer for macOS.
 set -e
 cd "$(dirname "$0")"
 EXT=extension
@@ -7,7 +7,7 @@ QK_VER=$(sed -n 's/^var QK_VERSION = "\(.*\)";/\1/p' extension/js/commands.js)
 OUT=dist/QuickKey
 rm -rf dist && mkdir -p "$OUT"
 
-# 1. the panel (pure HTML/JS — identical on Mac and Windows)
+# 1. the panel (pure HTML/JS -- identical on Mac and Windows)
 cp -R "$EXT" "$OUT/com.quickkey.dev"
 rm -f "$OUT/com.quickkey.dev/.debug"        # remote debugging is a dev-only door
 
@@ -23,7 +23,7 @@ lipo -create /tmp/qkd-arm64 /tmp/qkd-x86 -output "$APP/Contents/MacOS/QuickKeyDa
 rm -f /tmp/qkd-arm64 /tmp/qkd-x86
 codesign --force --sign - "$APP"
 
-# 3. installer — a real .app so a non-technical user never sees a terminal.
+# 3. installer -- a real .app so a non-technical user never sees a terminal.
 #    Payload lives inside the bundle, so the whole thing is one file to send.
 INST="$OUT/Install QuickKey.app"
 mkdir -p "$INST/Contents/MacOS" "$INST/Contents/Resources"
@@ -118,7 +118,7 @@ THEN
   Choose  Window > Extensions > QuickKey  to show the panel.
 
   Click a clip on the timeline and press  Control-Option-B.
-  Click a different clip and press it again — it follows your selection.
+  Click a different clip and press it again -- it follows your selection.
   That is the whole idea.
 
 
@@ -148,7 +148,7 @@ WHAT IS SET UP ALREADY
   Ctrl-Opt-1  switch mode
 
   Drop Shadow, Transform, Crop and Lens Distortion are ready but have no key
-  yet — click their key box to give them one.
+  yet -- click their key box to give them one.
 
 
 THINGS WE ALREADY KNOW ARE WRONG  (please tell us what else you find)
@@ -162,14 +162,14 @@ THINGS WE ALREADY KNOW ARE WRONG  (please tell us what else you find)
   - Some dropdown settings show as "Option 0 / 1 / 2" instead of real names.
   - Transitions land at the start of the selected clip.
   - If something fails, the Activity box at the bottom of the panel shows a red
-    line. Please copy it and send it over — that is genuinely useful to us.
+    line. Please copy it and send it over -- that is genuinely useful to us.
 
 
 TURNING IT OFF
 
   The hotkeys come from a small background app called QuickKeyDaemon,
   in your Applications folder. Quit it and every key goes back to normal.
-  It does not start by itself when you reboot — open it again when you want it.
+  It does not start by itself when you reboot -- open it again when you want it.
 INNER
 
 cd dist && zip -qr "QuickKey-mac-v$QK_VER.zip" QuickKey && cd ..

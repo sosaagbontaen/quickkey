@@ -1,5 +1,5 @@
 #!/bin/bash
-# release — build the current source and publish it as a GitHub release.
+# release -- build the current source and publish it as a GitHub release.
 #
 # Version comes from extension/js/commands.js, which is also what the panel
 # shows in its header, so a bug report can always name the build it came from.
@@ -17,12 +17,12 @@ if ! gh auth status >/dev/null 2>&1; then
 fi
 
 if [ -n "$(git status --porcelain)" ]; then
-  echo "!! uncommitted changes — commit them first so the tag matches what ships"
+  echo "!! uncommitted changes -- commit them first so the tag matches what ships"
   git status --short | sed 's/^/   /'
   exit 1
 fi
 
-echo "building v$VER…"
+echo "building v$VER..."
 ./package >/dev/null
 [ -f "$ZIP" ] || { echo "!! $ZIP was not produced"; exit 1; }
 
@@ -42,16 +42,27 @@ if [ -z "$NOTES" ]; then
 fi
 
 if gh release view "v$VER" >/dev/null 2>&1; then
-  echo "v$VER already released — replacing the file"
+  echo "v$VER already released -- replacing the file"
   gh release upload "v$VER" "$ZIP" --clobber
 else
   gh release create "v$VER" "$ZIP" \
     --title "QuickKey v$VER" \
     --notes "$NOTES
 
-**Install:** unzip, then open Terminal and run \`bash install.sh\` (drag the file onto the window to fill in the path). macOS will warn that the app is unverified — that is expected until we are signed.
+## Installing
 
-The panel header shows its version. Please include it in any bug report."
+1. Unzip, then double-click **Install QuickKey**.
+2. macOS will refuse and say it could not verify the app. Click **Done** -- not Move to Trash.
+3. Open **System Settings > Privacy & Security**, scroll to Security, and click **Open Anyway**.
+4. Double-click **Install QuickKey** again. It installs and tells you when it is done.
+
+Then quit Premiere completely, reopen it, and choose **Window > Extensions > QuickKey**.
+
+The warning is expected: this build is not signed by Apple yet. See READ ME FIRST.txt inside the zip.
+
+## Reporting a bug
+
+The panel header shows its version (\`v$VER\`). Please include it, and the red line from the panel's Activity box if there is one."
 fi
 
 echo

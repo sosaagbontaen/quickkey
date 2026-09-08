@@ -1,5 +1,5 @@
 #!/bin/bash
-# dev-install — copy the panel source into Premiere's extension folder and
+# dev-install -- copy the panel source into Premiere's extension folder and
 # rebuild the daemon. Run after editing anything in extension/ or daemon/.
 set -e
 cd "$(dirname "$0")"
