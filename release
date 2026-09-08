@@ -1,0 +1,58 @@
+#!/bin/bash
+# release — build the current source and publish it as a GitHub release.
+#
+# Version comes from extension/js/commands.js, which is also what the panel
+# shows in its header, so a bug report can always name the build it came from.
+set -e
+cd "$(dirname "$0")"
+export PATH="$HOME/.local/bin:$PATH"
+
+VER=$(sed -n 's/^var QK_VERSION = "\(.*\)";/\1/p' extension/js/commands.js)
+[ -z "$VER" ] && { echo "!! no QK_VERSION in extension/js/commands.js"; exit 1; }
+ZIP="dist/QuickKey-mac-v$VER.zip"
+
+if ! command -v gh >/dev/null; then echo "!! gh not found on PATH"; exit 1; fi
+if ! gh auth status >/dev/null 2>&1; then
+  echo "!! not signed in to GitHub. Run:  gh auth login"; exit 1
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "!! uncommitted changes — commit them first so the tag matches what ships"
+  git status --short | sed 's/^/   /'
+  exit 1
+fi
+
+echo "building v$VER…"
+./package >/dev/null
+[ -f "$ZIP" ] || { echo "!! $ZIP was not produced"; exit 1; }
+
+# Refuse to ship a build that does not match the committed source.
+EXT="Install QuickKey.app/Contents/Resources/com.quickkey.dev"
+for f in js/main.js js/commands.js jsx/host.jsx index.html; do
+  A=$(shasum -a 256 "extension/$f" | cut -d' ' -f1)
+  B=$(shasum -a 256 "dist/QuickKey/$EXT/$f" | cut -d' ' -f1)
+  [ "$A" = "$B" ] || { echo "!! packaged $f differs from source"; exit 1; }
+done
+grep -rl "$USER" dist/QuickKey/ >/dev/null 2>&1 && { echo "!! build contains local paths"; exit 1; }
+echo "  verified against source"
+
+NOTES="${1:-}"
+if [ -z "$NOTES" ]; then
+  NOTES=$(git log --oneline -8 --pretty='- %s')
+fi
+
+if gh release view "v$VER" >/dev/null 2>&1; then
+  echo "v$VER already released — replacing the file"
+  gh release upload "v$VER" "$ZIP" --clobber
+else
+  gh release create "v$VER" "$ZIP" \
+    --title "QuickKey v$VER" \
+    --notes "$NOTES
+
+**Install:** unzip, then open Terminal and run \`bash install.sh\` (drag the file onto the window to fill in the path). macOS will warn that the app is unverified — that is expected until we are signed.
+
+The panel header shows its version. Please include it in any bug report."
+fi
+
+echo
+gh release view "v$VER" --json url --jq '"  released: " + .url'

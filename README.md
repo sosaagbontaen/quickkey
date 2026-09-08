@@ -38,7 +38,8 @@ Runtime config lives in `~/Library/Application Support/QuickKey/`, not here.
 ./dev-install     # copy extension/ into Premiere, rebuild the daemon
 ./start           # run the daemon
 ./stop            # kill it, releasing every bound key
-./package         # build dist/QuickKey-mac.zip for sharing
+./package         # build the versioned zip into dist/
+./release         # build, verify, and publish it as a GitHub release
 ./restore         # list or roll back config snapshots
 ```
 
