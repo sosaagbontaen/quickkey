@@ -1044,6 +1044,11 @@
     if (!found.length) return;
     var slot = slotById(slotId), hit = found[0];
 
+    // We said the effect does not exist; it does, just not here. Drop that
+    // message rather than contradicting it a line later.
+    var stale = node.querySelector(".nomatch");
+    if (stale) stale.parentNode.removeChild(stale);
+
     var box = document.createElement("div");
     box.className = "elsewhere";
     var t = document.createElement("div");
