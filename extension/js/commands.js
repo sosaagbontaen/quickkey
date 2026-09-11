@@ -1,4 +1,4 @@
-var QK_VERSION = "0.4.1";
+var QK_VERSION = "0.4.2";
 
 // QuickKey catalogue.
 //

@@ -326,3 +326,15 @@ header{display:flex;justify-content:space-between;align-items:center}
 }
 .elseact:hover{background:var(--accent-hi)}
 .elsenote{margin-top:7px;font-size:11px;color:var(--dim)}
+
+/* results this QuickKey cannot apply: visible, explained, not selectable */
+.fx.out{opacity:.45;cursor:default}
+.fx.out .fxicon svg{stroke:var(--dim)}
+.fx.out:hover{background:var(--row)}
+.fx.out.takeable{cursor:pointer}
+.fx.out.takeable:hover{opacity:.85;background:var(--row-hi)}
+.outwhy{
+  margin-left:auto;font-family:var(--f-mono, ui-monospace),Menlo,monospace;
+  font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);white-space:nowrap;
+}
+.fx.out.takeable .outwhy{color:var(--accent)}

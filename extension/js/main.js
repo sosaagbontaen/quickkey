@@ -1040,71 +1040,80 @@
     });
   }
 
-  // Three reasons a search comes up empty, and they need different answers:
-  // it exists but is not this family, it exists but is another kind entirely,
-  // or Premiere simply does not have it.
-  function explainMissing(ql, type, meta, all, slotId, node) {
-    var outsideFamily = (meta && meta.match)
-      ? all.filter(function (n) { return n.toLowerCase().indexOf(ql) !== -1; })
-      : [];
+  // Show every match, and mark the ones this QuickKey cannot apply rather than
+  // picking one and calling it the explanation. The user can see the whole
+  // picture and decide; we only enforce what is selectable.
+  function renderOutOfScope(ql, type, meta, all, inScopeNames, node) {
+    var taken = {};
+    inScopeNames.forEach(function (n) { taken[n] = 1; });
 
-    if (outsideFamily.length) {
-      var slot = slotById(slotId);
-      var box = document.createElement("div");
-      box.className = "elsewhere";
-      var t = document.createElement("div");
-      t.innerHTML = "<b>" + outsideFamily[0] + "</b> is a " + TYPE_LABEL[type] +
-        ", but this QuickKey applies " + (meta.family || "a specific group").toLowerCase() + ".";
-      box.appendChild(t);
-      var n = document.createElement("div");
-      n.className = "elsenote";
-      n.textContent = "Use \u201c+ add QuickKey\u201d to make one for it.";
-      box.appendChild(n);
-      var stale = node.querySelector(".nomatch");
-      if (stale) stale.parentNode.removeChild(stale);
-      node.appendChild(box);
-      return;
+    var others = ["video", "audio", "transition"].filter(function (t) { return t !== type; });
+    var results = [];
+
+    // Same kind, but outside this QuickKey's group (a lens distortion in a blur).
+    if (meta && meta.match) {
+      all.forEach(function (n) {
+        if (!taken[n] && n.toLowerCase().indexOf(ql) !== -1)
+          results.push({ name: n, type: type, why: "not " + (meta.family || "this group").toLowerCase() });
+      });
     }
-    lookElsewhere(ql, type, slotId, node);
+
+    var pending = others.length;
+    others.forEach(function (t) {
+      loadType(t, function (list) {
+        list.forEach(function (n) {
+          if (n.toLowerCase().indexOf(ql) !== -1)
+            results.push({ name: n, type: t, why: TYPE_LABEL[t] });
+        });
+        if (--pending === 0) paintOutOfScope(results, type, meta, inScopeNames, node);
+      });
+    });
   }
 
-  function showElsewhere(found, currentType, slotId, node) {
+  function paintOutOfScope(results, type, meta, inScopeNames, node) {
     var stale = node.querySelector(".nomatch");
-    if (!found.length) {
-      if (stale) stale.innerHTML =
-        "Premiere has no " + TYPE_LABEL[currentType] + " by that name." +
-        "<br><br>This lists Premiere\u2019s own effects. Presets you saved, Motion Graphics " +
-        "templates and Essential Graphics items are not in it, and QuickKey cannot apply them yet.";
+
+    if (!results.length) {
+      if (!inScopeNames.length && stale) {
+        stale.innerHTML = "Premiere has no " + TYPE_LABEL[type] + " by that name." +
+          "<br><br>This lists Premiere\u2019s own effects. Presets you saved, Motion Graphics " +
+          "templates and Essential Graphics items are not in it, and QuickKey cannot apply them yet.";
+      } else if (stale) { stale.parentNode.removeChild(stale); }
       return;
     }
-    var slot = slotById(slotId), hit = found[0];
     if (stale) stale.parentNode.removeChild(stale);
 
-    var box = document.createElement("div");
-    box.className = "elsewhere";
-    var t = document.createElement("div");
-    t.innerHTML = "<b>" + hit.name + "</b> is a " + TYPE_LABEL[hit.type] +
-                  ", and this QuickKey applies " + TYPE_LABEL[currentType] + "s.";
-    box.appendChild(t);
+    var head = document.createElement("div");
+    head.className = "fxfilter";
+    head.textContent = "not available for this QuickKey";
+    node.appendChild(head);
 
-    // Only a QuickKey you created can change what kind of thing it applies.
-    if (slot && !templateFor(slot.id)) {
-      var act = document.createElement("div");
-      act.className = "elseact";
-      act.textContent = "Make this a " + TYPE_LABEL[hit.type] + " QuickKey";
-      act.onclick = function () {
-        mark("change " + slot.label + " to " + hit.type);
-        slot.type = hit.type; slot.effect = ""; slot.params = "";
-        save(); closePicker(); renderAll(); openPicker(slotId, "");
+    results.forEach(function (r) {
+      var slot = slotById(pickerTarget);
+      var custom = slot && !templateFor(slot.id);
+      var canTake = custom && r.type !== type;      // a QuickKey you made can change kind
+
+      var d = document.createElement("div");
+      d.className = "fx out" + (canTake ? " takeable" : "");
+      var fi = document.createElement("span"); fi.className = "fxicon";
+      fi.innerHTML = qkIconFor(r.name, "wand");
+      var fl = document.createElement("span"); fl.textContent = r.name;
+      var tag = document.createElement("span"); tag.className = "outwhy";
+      tag.textContent = canTake ? r.why + " \u00b7 use anyway" : r.why;
+      d.appendChild(fi); d.appendChild(fl); d.appendChild(tag);
+      d.title = canTake
+        ? "Switch this QuickKey to " + TYPE_LABEL[r.type] + "s and use " + r.name
+        : r.name + " is " + (r.type === type ? "outside this group" : "a " + TYPE_LABEL[r.type]) +
+          ". Make your own QuickKey with \u201c+ add QuickKey\u201d to use it.";
+
+      if (canTake) d.onclick = function () {
+        mark("change " + slot.label + " to " + r.type);
+        slot.type = r.type; slot.effect = r.name; slot.params = "";
+        save(); closePicker(); renderAll();
+        log("set " + slot.label + " -> " + r.name + " (" + TYPE_LABEL[r.type] + ")", "ok");
       };
-      box.appendChild(act);
-    } else {
-      var note = document.createElement("div");
-      note.className = "elsenote";
-      note.textContent = "Add a QuickKey of that kind to use it.";
-      box.appendChild(note);
-    }
-    node.appendChild(box);
+      node.appendChild(d);
+    });
   }
 
   function drawPicker(q, current) {
@@ -1133,8 +1142,10 @@
     }
 
 
+    var inScopeNames = [];
     shown.forEach(function (name) {
       if (ql && name.toLowerCase().indexOf(ql) === -1) return;
+      inScopeNames.push(name);
       var d = document.createElement("div");
       d.className = "fx" + (name === current ? " on" : "");
       var fi = document.createElement("span"); fi.className = "fxicon";
@@ -1153,13 +1164,16 @@
       };
       list.appendChild(d);
     });
-    if (!list.querySelectorAll(".fx").length) {
-      list.innerHTML = "";
-      var m = document.createElement("div");
-      m.className = "nomatch";
-      m.textContent = ql ? "Searching\u2026" : "Nothing to show.";
-      list.appendChild(m);
-      if (ql) explainMissing(ql, type, meta, all, pickerTarget, list);
+    if (ql) {
+      if (!inScopeNames.length) {
+        var m = document.createElement("div");
+        m.className = "nomatch";
+        m.textContent = "Searching\u2026";
+        list.appendChild(m);
+      }
+      renderOutOfScope(ql, type, meta, all, inScopeNames, list);
+    } else if (!list.querySelectorAll(".fx").length) {
+      list.innerHTML = "<div class='nomatch'>Nothing to show.</div>";
     }
   }
   function closePicker(){ document.getElementById("picker").className = "picker"; pickerTarget = null; }
