@@ -22,6 +22,17 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
+# GitHub tags the remote's tip, not our local HEAD. Releasing with unpushed
+# commits produces a tag pointing at older source than the zip contains --
+# which silently defeats the point of tagging at all.
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git fetch -q origin "$BRANCH" 2>/dev/null || true
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$BRANCH" 2>/dev/null)" ]; then
+  echo "!! local commits are not pushed -- the release tag would point at older code"
+  echo "   run:  git push origin $BRANCH"
+  exit 1
+fi
+
 echo "building v$VER..."
 ./package >/dev/null
 [ -f "$ZIP" ] || { echo "!! $ZIP was not produced"; exit 1; }
