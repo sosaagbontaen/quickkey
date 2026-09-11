@@ -485,6 +485,35 @@ $.global.qkClipAt = function (track, seconds) {
     return null;
 };
 
+
+// A nested sequence on the timeline is not one item: it is a video item plus
+// its linked audio, on separate tracks. Removing only the video leaves the
+// audio sitting there, still coloured as a nest.
+$.global.qkRemoveNestInstance = function (seq, nodeId, atSeconds) {
+    var removed = 0;
+    for (var pass = 0; pass < 12; pass++) {
+        var found = null;
+        var kinds = [["video", seq.videoTracks], ["audio", seq.audioTracks]];
+        for (var g = 0; g < kinds.length && !found; g++) {
+            var tracks = kinds[g][1];
+            for (var t = 0; t < tracks.numTracks && !found; t++) {
+                var clips = tracks[t].clips;
+                for (var i = 0; i < clips.numItems; i++) {
+                    var cl = clips[i];
+                    if (!cl.projectItem || cl.projectItem.nodeId !== nodeId) continue;
+                    if (Math.abs(cl.start.seconds - atSeconds) > 0.02) continue;  // a different instance
+                    found = { kind: kinds[g][0], track: t, index: i, clip: cl, name: cl.name };
+                    break;
+                }
+            }
+        }
+        if (!found) break;
+        qkQEItem(found).remove(false, false);
+        removed++;
+    }
+    return removed;
+};
+
 $.global.qkFindSequenceFor = function (projectItem) {
     for (var i = 0; i < app.project.sequences.numSequences; i++) {
         var s = app.project.sequences[i];
@@ -551,8 +580,9 @@ $.global.qkUnnest = function () {
         return "ERR: this nest needs " + needed + " video tracks and the sequence has " +
                seq.videoTracks.numTracks + ". Add " + (needed - seq.videoTracks.numTracks) + " and try again.";
 
-    // Remove the nest first so its space is free to write into.
-    qkQEItem(hit).remove(false, false);
+    // Remove every part of the nest -- video and its linked audio -- before
+    // writing into the space it occupied.
+    var nestParts = qkRemoveNestInstance(seq, nest.projectItem.nodeId, nestStart);
 
     var placed = 0, fxRestored = 0, failed = [];
     for (var p = 0; p < plan.length; p++) {
@@ -584,6 +614,7 @@ $.global.qkUnnest = function () {
     }
 
     var msg = "OK: unnested " + placed + " clip(s)";
+    if (nestParts > 1) msg += " (removed " + nestParts + " nest parts)";
     if (fxRestored) msg += ", " + fxRestored + " effect(s) kept";
     if (skipped) msg += ", " + skipped + " outside the trim";
     if (failed.length) msg += "  [failed: " + failed.join(", ") + "]";
