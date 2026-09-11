@@ -1040,13 +1040,44 @@
     });
   }
 
-  function showElsewhere(found, currentType, slotId, node) {
-    if (!found.length) return;
-    var slot = slotById(slotId), hit = found[0];
+  // Three reasons a search comes up empty, and they need different answers:
+  // it exists but is not this family, it exists but is another kind entirely,
+  // or Premiere simply does not have it.
+  function explainMissing(ql, type, meta, all, slotId, node) {
+    var outsideFamily = (meta && meta.match)
+      ? all.filter(function (n) { return n.toLowerCase().indexOf(ql) !== -1; })
+      : [];
 
-    // We said the effect does not exist; it does, just not here. Drop that
-    // message rather than contradicting it a line later.
+    if (outsideFamily.length) {
+      var slot = slotById(slotId);
+      var box = document.createElement("div");
+      box.className = "elsewhere";
+      var t = document.createElement("div");
+      t.innerHTML = "<b>" + outsideFamily[0] + "</b> is a " + TYPE_LABEL[type] +
+        ", but this QuickKey applies " + (meta.family || "a specific group").toLowerCase() + ".";
+      box.appendChild(t);
+      var n = document.createElement("div");
+      n.className = "elsenote";
+      n.textContent = "Use \u201c+ add QuickKey\u201d to make one for it.";
+      box.appendChild(n);
+      var stale = node.querySelector(".nomatch");
+      if (stale) stale.parentNode.removeChild(stale);
+      node.appendChild(box);
+      return;
+    }
+    lookElsewhere(ql, type, slotId, node);
+  }
+
+  function showElsewhere(found, currentType, slotId, node) {
     var stale = node.querySelector(".nomatch");
+    if (!found.length) {
+      if (stale) stale.innerHTML =
+        "Premiere has no " + TYPE_LABEL[currentType] + " by that name." +
+        "<br><br>This lists Premiere\u2019s own effects. Presets you saved, Motion Graphics " +
+        "templates and Essential Graphics items are not in it, and QuickKey cannot apply them yet.";
+      return;
+    }
+    var slot = slotById(slotId), hit = found[0];
     if (stale) stale.parentNode.removeChild(stale);
 
     var box = document.createElement("div");
@@ -1084,36 +1115,21 @@
     var type = slot ? slot.type : "video";
     var all = effectCache[type] || [];
 
-    // A "default blur" slot should open on the blurs, not on 136 effects the
-    // user has to know the name of. Searching still reaches everything.
+    // A blur slot lists blurs and nothing else: if it could hold a Lens
+    // Distortion, the row's own label would be a lie. Anything outside the
+    // family belongs in a QuickKey of your own.
     var meta = slot ? (templateFor(slot.id) || slot) : null;
-    // A blur slot only ever wants blurs. Scope the list to the family and search
-    // within it, rather than making the user wade through 136 effects.
     var rx = (meta && meta.match) ? new RegExp(meta.match, "i") : null;
     var shown = rx ? all.filter(function (n) { return rx.test(n); }) : all;
     if (rx && !shown.length) { shown = all; rx = null; }
 
-    // Typing should reach the whole catalogue even from a family-scoped slot:
-    // the family is a starting point, not a cage.
-    var widened = false;
-    if (ql && rx) {
-      var inFamily = shown.filter(function (n) { return n.toLowerCase().indexOf(ql) !== -1; });
-      if (!inFamily.length) {
-        var anywhere = all.filter(function (n) { return n.toLowerCase().indexOf(ql) !== -1; });
-        if (anywhere.length) { shown = all; rx = null; widened = true; }
-      }
-    }
-
-    if (rx) {
+    // The family header is context for browsing; while searching it is noise,
+    // and it also made the list look non-empty when nothing matched.
+    if (rx && !ql) {
       var bar = document.createElement("div");
       bar.className = "fxfilter";
       bar.textContent = (meta.family || "Matching") + " \u00b7 " + shown.length;
       list.appendChild(bar);
-    } else if (widened) {
-      var wbar = document.createElement("div");
-      wbar.className = "fxfilter";
-      wbar.textContent = "outside " + (meta.family || "this group") + " \u00b7 showing all effects";
-      list.appendChild(wbar);
     }
 
 
@@ -1137,18 +1153,13 @@
       };
       list.appendChild(d);
     });
-    if (!list.children.length) {
-      var kind = type === "audio" ? "audio effect" : type === "transition" ? "transition" : "video effect";
+    if (!list.querySelectorAll(".fx").length) {
+      list.innerHTML = "";
       var m = document.createElement("div");
       m.className = "nomatch";
-      m.innerHTML = ql
-        ? "Premiere has no " + kind + " called \u201c" + ql.replace(/[<>&]/g, "") + "\u201d." +
-          "<br><br>This list is Premiere\u2019s own effects. Presets you saved yourself, " +
-          "Motion Graphics templates, and anything from the Essential Graphics panel are not in it " +
-          "and QuickKey cannot apply them yet."
-        : "Nothing to show.";
+      m.textContent = ql ? "Searching\u2026" : "Nothing to show.";
       list.appendChild(m);
-      if (ql) lookElsewhere(ql, type, pickerTarget, list);
+      if (ql) explainMissing(ql, type, meta, all, pickerTarget, list);
     }
   }
   function closePicker(){ document.getElementById("picker").className = "picker"; pickerTarget = null; }
