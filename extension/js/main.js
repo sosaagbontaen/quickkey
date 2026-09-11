@@ -131,14 +131,14 @@
     }
     var h = history.pop();
     future.push({ desc: h.desc, data: snap() });
-    apply(h.data); save(); render();
+    apply(h.data); save(); renderAll();
     log("undid: " + h.desc, "ok");
   }
   function redo() {
     if (!future.length) { log("nothing to redo"); return; }
     var f = future.pop();
     history.push({ desc: f.desc, data: snap() });
-    apply(f.data); save(); render();
+    apply(f.data); save(); renderAll();
     log("redid: " + f.desc, "ok");
   }
 
@@ -469,7 +469,7 @@
   // keystroke we are trying to capture — and run that command instead. Ask it to
   // let go first, and only prompt once it confirms.
   function beginArming(id) {
-    listening = id; armError = null; armReady = false; render();
+    listening = id; armError = null; armReady = false; renderAll();
     // Give the view something focusable, or real keystrokes never arrive.
     var el = document.getElementById("cmd-" + id);
     if (el) { el.tabIndex = -1; focusSoon(el); }
@@ -485,7 +485,7 @@
         clearInterval(poll);
         armReady = true;
         if (!ok) log("could not pause shortcuts — is QuickKeyDaemon running?", "bad");
-        render();
+        renderAll();
       }
     }, 100);
 
@@ -497,7 +497,7 @@
     listening = null; armReady = false; armError = null;
     clearTimeout(armTimer);
     writeFile(BRIDGE + "/suspend.json", JSON.stringify({ on: false, t: Date.now() }));
-    render();
+    renderAll();
   }
 
   function chipFor(id, keyObj, onAssign) {
@@ -527,7 +527,7 @@
     elList.appendChild(g);
   }
 
-  function render() {
+  function renderAll() {
     // mode dropdown
     var sel = document.getElementById("modeSelect");
     sel.innerHTML = "";
@@ -575,7 +575,7 @@
         badge.textContent = (expanded === s.id ? "\u2304 " : "\u203a ") +
           (n ? "your settings (" + n + ")" : "using Premiere\u2019s settings");
         badge.onclick = function (e) {
-          e.stopPropagation(); expanded = (expanded === s.id) ? null : s.id; render();
+          e.stopPropagation(); expanded = (expanded === s.id) ? null : s.id; renderAll();
         };
         body.appendChild(badge);
       }
@@ -620,7 +620,7 @@
           mark("remove \u201c" + s.label + "\u201d from " + (m ? m.name : ""));
           var md = mode();
           md.slots = md.slots.filter(function (x) { return x.id !== s.id; });
-          save(); render();
+          save(); renderAll();
           log("removed \u201c" + s.label + "\u201d — \u2318Z to undo", "ok");
         });
       };
@@ -738,7 +738,7 @@
         clear.textContent = "Clear captured settings — use the effect's own defaults";
         clear.onclick = function () {
           mark("clear captured settings"); s.params = "";
-          expanded = null; save(); render(); log("cleared captured settings", "ok");
+          expanded = null; save(); renderAll(); log("cleared captured settings", "ok");
         };
         if (cfg.params) det.appendChild(clear);
         elList.appendChild(det);
@@ -837,7 +837,7 @@
       e.stopPropagation();
       var mods = [];
       ["ctrl", "opt", "cmd", "shift"].forEach(function (m) { if (chosen[m]) mods.push(m); });
-      if (!mods.length) { armError = "pick Ctrl or Opt as well"; render(); return; }
+      if (!mods.length) { armError = "pick Ctrl or Opt as well"; renderAll(); return; }
       assignKey(id, sel.value, mods);
     };
     wrap.appendChild(set);
@@ -875,7 +875,7 @@
     if (state.activeMode === id) return;
     state.activeMode = id;
     save();                      // rewrites bindings; daemon reloads within ~1s
-    render();
+    renderAll();
     log("mode → " + mode().name, "ok");
   }
 
@@ -895,7 +895,7 @@
     var m = newMode(name);
     state.modes.push(m); state.activeMode = m.id;
     document.getElementById("modeNameWrap").className = "newmode";
-    save(); render(); log("created mode '" + name + "'", "ok");
+    save(); renderAll(); log("created mode '" + name + "'", "ok");
   };
   document.getElementById("modeDel").onclick = function () {
     if (state.modes.length < 2) { log("keep at least one mode", "bad"); return; }
@@ -904,7 +904,7 @@
       mark("delete mode \u201c" + m.name + "\u201d");
       state.modes = state.modes.filter(function (x) { return x.id !== m.id; });
       state.activeMode = state.modes[0].id;
-      save(); render();
+      save(); renderAll();
       log("deleted \u201c" + m.name + "\u201d — \u2318Z to undo", "ok");
     });
   };
@@ -936,7 +936,7 @@
                  effect: "", params: "" };
     mode().slots.push(slot);
     document.getElementById("slotAddWrap").className = "newmode";
-    save(); render();
+    save(); renderAll();
     log("added \u201c" + name + "\u201d — pick its effect, then give it a key", "ok");
   };
 
@@ -1006,6 +1006,71 @@
   }
 
 
+  var TYPE_LABEL = { video: "video effect", audio: "audio effect", transition: "transition" };
+  var TYPE_CMD   = { video: "qkListEffects()", audio: "qkListAudioEffects()", transition: "qkListTransitions()" };
+
+  function loadType(type, cb) {
+    if (effectCache[type] && effectCache[type].length) return cb(effectCache[type]);
+    evalHost(TYPE_CMD[type], function (r) {
+      var seen = {};
+      var list = String(r).split("|").filter(function (x) {
+        if (!x || x.indexOf("QK_ERR") === 0 || seen[x]) return false;
+        seen[x] = 1; return true;
+      });
+      if (list.length) effectCache[type] = list;
+      cb(list);
+    });
+  }
+
+  // "No match" was a lie: the effect existed, in a catalogue this slot does not
+  // search. Look next door before telling someone their effect is not real.
+  // "No match" was a lie: the effect existed, in a catalogue this slot does not
+  // search. Look next door before telling someone their effect is not real.
+  function lookElsewhere(ql, currentType, slotId, node) {
+    var others = ["video", "audio", "transition"].filter(function (t) { return t !== currentType; });
+    var found = [], pending = others.length;
+
+    others.forEach(function (t) {
+      loadType(t, function (list) {
+        list.forEach(function (n) {
+          if (n.toLowerCase().indexOf(ql) !== -1) found.push({ type: t, name: n });
+        });
+        if (--pending === 0) showElsewhere(found, currentType, slotId, node);
+      });
+    });
+  }
+
+  function showElsewhere(found, currentType, slotId, node) {
+    if (!found.length) return;
+    var slot = slotById(slotId), hit = found[0];
+
+    var box = document.createElement("div");
+    box.className = "elsewhere";
+    var t = document.createElement("div");
+    t.innerHTML = "<b>" + hit.name + "</b> is a " + TYPE_LABEL[hit.type] +
+                  ", and this QuickKey applies " + TYPE_LABEL[currentType] + "s.";
+    box.appendChild(t);
+
+    // Only a QuickKey you created can change what kind of thing it applies.
+    if (slot && !templateFor(slot.id)) {
+      var act = document.createElement("div");
+      act.className = "elseact";
+      act.textContent = "Make this a " + TYPE_LABEL[hit.type] + " QuickKey";
+      act.onclick = function () {
+        mark("change " + slot.label + " to " + hit.type);
+        slot.type = hit.type; slot.effect = ""; slot.params = "";
+        save(); closePicker(); renderAll(); openPicker(slotId, "");
+      };
+      box.appendChild(act);
+    } else {
+      var note = document.createElement("div");
+      note.className = "elsenote";
+      note.textContent = "Add a QuickKey of that kind to use it.";
+      box.appendChild(note);
+    }
+    node.appendChild(box);
+  }
+
   function drawPicker(q, current) {
     var list = document.getElementById("pickerList");
     list.innerHTML = "";
@@ -1023,11 +1088,27 @@
     var shown = rx ? all.filter(function (n) { return rx.test(n); }) : all;
     if (rx && !shown.length) { shown = all; rx = null; }
 
+    // Typing should reach the whole catalogue even from a family-scoped slot:
+    // the family is a starting point, not a cage.
+    var widened = false;
+    if (ql && rx) {
+      var inFamily = shown.filter(function (n) { return n.toLowerCase().indexOf(ql) !== -1; });
+      if (!inFamily.length) {
+        var anywhere = all.filter(function (n) { return n.toLowerCase().indexOf(ql) !== -1; });
+        if (anywhere.length) { shown = all; rx = null; widened = true; }
+      }
+    }
+
     if (rx) {
       var bar = document.createElement("div");
       bar.className = "fxfilter";
       bar.textContent = (meta.family || "Matching") + " \u00b7 " + shown.length;
       list.appendChild(bar);
+    } else if (widened) {
+      var wbar = document.createElement("div");
+      wbar.className = "fxfilter";
+      wbar.textContent = "outside " + (meta.family || "this group") + " \u00b7 showing all effects";
+      list.appendChild(wbar);
     }
 
 
@@ -1046,12 +1127,24 @@
         var slotId = pickerTarget;
         var sl = slotById(slotId);
         if (sl) { sl.effect = name; sl.params = ""; }
-        closePicker(); save(); render();
+        closePicker(); save(); renderAll();
         log("set " + slotId + " → " + name, "ok");
       };
       list.appendChild(d);
     });
-    if (!list.children.length) list.innerHTML = "<div class='fx'>no match</div>";
+    if (!list.children.length) {
+      var kind = type === "audio" ? "audio effect" : type === "transition" ? "transition" : "video effect";
+      var m = document.createElement("div");
+      m.className = "nomatch";
+      m.innerHTML = ql
+        ? "Premiere has no " + kind + " called \u201c" + ql.replace(/[<>&]/g, "") + "\u201d." +
+          "<br><br>This list is Premiere\u2019s own effects. Presets you saved yourself, " +
+          "Motion Graphics templates, and anything from the Essential Graphics panel are not in it " +
+          "and QuickKey cannot apply them yet."
+        : "Nothing to show.";
+      list.appendChild(m);
+      if (ql) lookElsewhere(ql, type, pickerTarget, list);
+    }
   }
   function closePicker(){ document.getElementById("picker").className = "picker"; pickerTarget = null; }
 
@@ -1091,7 +1184,7 @@
       var sl = slotById(slotId);
       if (!sl) { log("that default no longer exists", "bad"); return; }
       sl.effect = effectName; sl.params = s.slice(3);
-      save(); render();
+      save(); renderAll();
       log("captured " + effectName + " settings", "ok");
     });
   }
@@ -1133,7 +1226,7 @@
         // happened at all. Say it on the row, and stay armed for another try.
         armError = "that key needs Control or Option \u2014 try again";
         log("shortcuts need a modifier: hold Ctrl or Option, then the key", "bad");
-        render();
+        renderAll();
         return;
       }
 
@@ -1192,7 +1285,7 @@
   // ---------- boot ----------
   loadConfig(); seedNewActions(); scrubParams(); save();
   helpOpen = !state.helpSeen;   // first run explains itself
-  renderHelp(); render();
+  renderHelp(); renderAll();
   evalHost("$.evalFile(File(" + JSON.stringify(HOSTJSX) + ")); app.setExtensionPersistent('com.quickkey.dev.panel',1); 'ready ' + app.version",
     function (v) {
       document.getElementById("dot").className = "on";

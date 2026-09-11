@@ -347,6 +347,144 @@ $.global.qkListTransitions = function () {
 // the right length. Those are restored afterwards.
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Component capture and restore.
+//
+// Placing a clip with overwriteClip gives you the media and nothing else: no
+// effects, and Motion/Opacity back at their defaults. Un-nesting therefore has
+// to carry a clip's whole component stack across by hand.
+// ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// Single-step undo for multi-step commands.
+//
+// Un-nest is many Premiere operations, and Premiere exposes no way to group
+// them into one undo entry - only undo(), redo() and undoStackIndex(). So we
+// watch for the user's first ctrl-z and finish the job ourselves.
+//
+// Deliberately narrow: armed only while our command is the most recent thing
+// that happened, and it expires. If anything else is done first, Premiere
+// behaves exactly as it normally would.
+// ---------------------------------------------------------------------------
+
+$.global.qkUndoWatch = null;
+
+$.global.qkArmUndoCollapse = function (steps, label) {
+    if (!steps || steps < 2) return;
+    app.enableQE();
+    $.global.qkUndoWatch = {
+        at:    qe.project.undoStackIndex(),
+        steps: steps,
+        label: label,
+        until: (new Date()).getTime() + 30000
+    };
+    app.setTimeout(qkUndoTick, 250);
+};
+
+$.global.qkUndoTick = function () {
+    var w = $.global.qkUndoWatch;
+    if (!w) return;
+    if ((new Date()).getTime() > w.until) { $.global.qkUndoWatch = null; return; }
+
+    app.enableQE();
+    var now = qe.project.undoStackIndex();
+
+    if (now === w.at) { app.setTimeout(qkUndoTick, 250); return; }  // nothing yet
+    $.global.qkUndoWatch = null;                                     // one shot either way
+    if (now > w.at) return;                                          // they did something else
+    if (now !== w.at - 1) return;                                    // they undid past us
+
+    for (var i = 0; i < w.steps - 1; i++) qe.project.undo();
+};
+
+$.global.qkIntrinsic = { "Motion":1, "Opacity":1, "Time Remapping":1,
+                         "Volume":1, "Channel Volume":1, "Panner":1 };
+
+$.global.qkCaptureComponents = function (clip) {
+    var out = [];
+    for (var i = 0; i < clip.components.numItems; i++) {
+        var comp = clip.components[i], name = comp.displayName;
+        if (!name) continue;
+        var entry = { name: name, intrinsic: !!qkIntrinsic[name], props: [] };
+        for (var j = 0; j < comp.properties.numItems; j++) {
+            var pr = comp.properties[j], pn = pr.displayName;
+            if (!pn || pn.charAt(0) === "_" || pn === "Error occurred" || pn === "Controls") continue;
+
+            var rec = { name: pn, value: null, keys: [] };
+            try { rec.value = pr.getValue(); } catch (e) { continue; }
+            if (typeof rec.value !== "number" && typeof rec.value !== "boolean") continue;
+
+            // Keyframes are the whole point for things like a slow zoom.
+            try {
+                if (pr.isTimeVarying()) {
+                    var ks = pr.getKeys();
+                    for (var k = 0; k < ks.length; k++) {
+                        var v = pr.getValueAtKey(ks[k]);
+                        if (typeof v === "number" || typeof v === "boolean")
+                            rec.keys.push({ t: ks[k].seconds, v: v });
+                    }
+                }
+            } catch (e) {}
+            entry.props.push(rec);
+        }
+        out.push(entry);
+    }
+    return out;
+};
+
+$.global.qkRestoreComponents = function (clip, hit, captured) {
+    app.enableQE();
+    var restored = 0, T = function (sec) { var t = new Time(); t.seconds = sec; return t; };
+
+    for (var c = 0; c < captured.length; c++) {
+        var entry = captured[c], target = null;
+
+        if (entry.intrinsic) {
+            for (var i = 0; i < clip.components.numItems; i++)
+                if (clip.components[i].displayName === entry.name) target = clip.components[i];
+        } else {
+            var fx = qe.project.getVideoEffectByName(entry.name);
+            if (!fx) continue;
+            if (!qkQEItem(hit).addVideoEffect(fx)) continue;
+            // The instance we just added is the last one carrying this name.
+            for (var m = 0; m < clip.components.numItems; m++)
+                if (clip.components[m].displayName === entry.name) target = clip.components[m];
+            restored++;
+        }
+        if (!target) continue;
+
+        for (var p = 0; p < entry.props.length; p++) {
+            var rec = entry.props[p], prop = null;
+            for (var q = 0; q < target.properties.numItems; q++)
+                if (target.properties[q].displayName === rec.name) { prop = target.properties[q]; break; }
+            if (!prop) continue;
+
+            try {
+                if (rec.keys && rec.keys.length) {
+                    prop.setTimeVarying(true);
+                    for (var k = 0; k < rec.keys.length; k++) {
+                        prop.addKey(T(rec.keys[k].t));
+                        prop.setValueAtKey(T(rec.keys[k].t), rec.keys[k].v, true);
+                    }
+                } else {
+                    prop.setValue(rec.value, true);
+                }
+            } catch (e) {}
+        }
+    }
+    return restored;
+};
+
+// Finds a clip by where it sits, since indexes shift as we place things.
+$.global.qkClipAt = function (track, seconds) {
+    for (var i = 0; i < track.clips.numItems; i++) {
+        if (Math.abs(track.clips[i].start.seconds - seconds) < 0.02) return { clip: track.clips[i], index: i };
+    }
+    return null;
+};
+
 $.global.qkFindSequenceFor = function (projectItem) {
     for (var i = 0; i < app.project.sequences.numSequences; i++) {
         var s = app.project.sequences[i];
@@ -361,14 +499,21 @@ $.global.qkUnnest = function () {
     var hits = qkOfKind(f.hits, "video");
     if (!hits.length) return "ERR: select a nested sequence on a video track";
 
-    var hit = hits[0], nest = hit.clip;
-    if (!nest.projectItem || !nest.projectItem.isSequence())
-        return "ERR: \u201c" + nest.name + "\u201d is not a nested sequence";
+    // Pick the nested sequence out of the selection rather than assuming it is
+    // first: selecting a nest often leaves other clips selected too.
+    var hit = null;
+    for (var h = 0; h < hits.length; h++) {
+        var pi = hits[h].clip.projectItem;
+        if (pi && pi.isSequence()) { hit = hits[h]; break; }
+    }
+    if (!hit) return "ERR: nothing in the selection is a nested sequence";
+    var nest = hit.clip;
 
     var src = qkFindSequenceFor(nest.projectItem);
     if (!src) return "ERR: could not find the sequence behind this nest";
 
     var seq = app.project.activeSequence;
+    var undoBefore = qe.project.undoStackIndex();
     var nestStart = nest.start.seconds,
         nestEnd   = nest.end.seconds,
         nestIn    = nest.inPoint.seconds;
@@ -391,7 +536,8 @@ $.global.qkUnnest = function () {
                 at:    ts + headTrim,
                 inP:   ic.inPoint.seconds + headTrim,
                 outP:  ic.outPoint.seconds - tailTrim,
-                name:  ic.name
+                name:  ic.name,
+                comps: qkCaptureComponents(ic)
             });
         }
     }
@@ -408,7 +554,7 @@ $.global.qkUnnest = function () {
     // Remove the nest first so its space is free to write into.
     qkQEItem(hit).remove(false, false);
 
-    var placed = 0, failed = [];
+    var placed = 0, fxRestored = 0, failed = [];
     for (var p = 0; p < plan.length; p++) {
         var item = plan[p];
         var keepIn = null, keepOut = null;
@@ -418,6 +564,15 @@ $.global.qkUnnest = function () {
             item.pi.setOutPoint(item.outP, 4);
             seq.videoTracks[item.track].overwriteClip(item.pi, item.at);
             placed++;
+
+            // overwriteClip gives us bare media; rebuild the stack we captured.
+            var landed = qkClipAt(seq.videoTracks[item.track], item.at);
+            if (landed) {
+                fxRestored += qkRestoreComponents(landed.clip,
+                    { kind: "video", track: item.track, index: landed.index,
+                      clip: landed.clip, name: landed.clip.name },
+                    item.comps);
+            }
         } catch (e) {
             failed.push(item.name);
         }
@@ -429,8 +584,10 @@ $.global.qkUnnest = function () {
     }
 
     var msg = "OK: unnested " + placed + " clip(s)";
+    if (fxRestored) msg += ", " + fxRestored + " effect(s) kept";
     if (skipped) msg += ", " + skipped + " outside the trim";
     if (failed.length) msg += "  [failed: " + failed.join(", ") + "]";
+    qkArmUndoCollapse(qe.project.undoStackIndex() - undoBefore, "un-nest");
     return msg;
 };
 
